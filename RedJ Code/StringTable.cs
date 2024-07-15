@@ -1,0 +1,20 @@
+﻿namespace RedJ_Code
+{
+    internal static class StringTable
+    {
+        public static readonly string ThreadExceptionMessageBoxCaption  = "Error";
+        public static readonly string FastColoredTextBoxHotkeys         = "Tab=IndentIncrease, Escape=ClearHints, PgUp=GoPageUp, PgDn=GoPageDown, End=GoEnd, Home=GoHome, Left=GoLeft, Up=GoUp, Right=GoRight, Down=GoDown, Ins=ReplaceMode, Del=DeleteCharRight, Ctrl+0=ZoomNormal, Ctrl+Add=ZoomIn, Ctrl+Subtract=ZoomOut, Ctrl+Oemplus=ZoomIn, Ctrl+OemMinus=ZoomOut, F3=FindNext, Ctrl+Alt+F=FindChar, Shift+Tab=IndentDecrease, Shift+PgUp=GoPageUpWithSelection, Shift+PgDn=GoPageDownWithSelection, Shift+End=GoEndWithSelection, Shift+Home=GoHomeWithSelection, Shift+Left=GoLeftWithSelection, Shift+Up=GoUpWithSelection, Shift+Right=GoRightWithSelection, Shift+Down=GoDownWithSelection, Shift+Ins=Paste, Shift+Del=Cut, Ctrl+Back=ClearWordLeft, Ctrl+Space=AutocompleteMenu, Ctrl+End=GoLastLine, Ctrl+Home=GoFirstLine, Ctrl+Left=GoWordLeft, Ctrl+Up=ScrollUp, Ctrl+Right=GoWordRight, Ctrl+Down=ScrollDown, Ctrl+Ins=Copy, Ctrl+Del=ClearWordRight, Ctrl+Shift+End=GoLastLineWithSelection, Ctrl+Shift+Home=GoFirstLineWithSelection, Ctrl+Shift+Left=GoWordLeftWithSelection, Ctrl+Shift+Right=GoWordRightWithSelection, Alt+Shift+Left=GoLeft_ColumnSelectionMode, Alt+Shift+Up=GoUp_ColumnSelectionMode, Alt+Shift+Right=GoRight_ColumnSelectionMode, Alt+Shift+Down=GoDown_ColumnSelectionMode";
+        public static readonly string ReadOnlyFastColoredTextBoxHotkeys = "PgUp=GoPageUp, PgDn=GoPageDown, End=GoEnd, Home=GoHome, Left=GoLeft, Up=GoUp, Right=GoRight, Down=GoDown, Ctrl+0=ZoomNormal, Ctrl+Add=ZoomIn, Ctrl+Subtract=ZoomOut, Ctrl+Oemplus=ZoomIn, Ctrl+OemMinus=ZoomOut, Shift+PgUp=GoPageUpWithSelection, Shift+PgDn=GoPageDownWithSelection, Shift+End=GoEndWithSelection, Shift+Home=GoHomeWithSelection, Shift+Left=GoLeftWithSelection, Shift+Up=GoUpWithSelection, Shift+Right=GoRightWithSelection, Shift+Down=GoDownWithSelection, Ctrl+Back=ClearWordLeft, Ctrl+Space=AutocompleteMenu, Ctrl+End=GoLastLine, Ctrl+Home=GoFirstLine, Ctrl+Left=GoWordLeft, Ctrl+Up=ScrollUp, Ctrl+Right=GoWordRight, Ctrl+Down=ScrollDown, Ctrl+Ins=Copy, Ctrl+Del=ClearWordRight, Ctrl+Shift+End=GoLastLineWithSelection, Ctrl+Shift+Home=GoFirstLineWithSelection, Ctrl+Shift+Left=GoWordLeftWithSelection, Ctrl+Shift+Right=GoWordRightWithSelection, Alt+Shift+Left=GoLeft_ColumnSelectionMode, Alt+Shift+Up=GoUp_ColumnSelectionMode, Alt+Shift+Right=GoRight_ColumnSelectionMode, Alt+Shift+Down=GoDown_ColumnSelectionMode, Ctrl+C=Copy, Ctrl+A=SelectAll";
+        public static readonly string OpenFileDialogTitle               = "Open File";
+        public static readonly string SaveFileDialogTitle               = "Save File";
+        public static readonly string ExportFileDialogTitle             = "Export File";
+        public static readonly string OpenFileDialogFilter              = "All Supported Types|*.txt;*.cs;*.html;*.htm;*.js;*.json;*.lua;*.php;*.sql;*.vb;*.xml|Plain Text|*.txt|C#|*.cs|HTML|*.html;*.htm|JavaScript|*.js|JSON|*.json|Lua|*.lua|PHP|*.php|SQL|*.sql|Visual Basic|*.vb|XML|*.xml|All Files|*";
+        public static readonly string SaveFileDialogFilter              = "Plain Text|*.txt|C#|*.cs|HTML|*.html;*.htm|JavaScript|*.js|JSON|*.json|Lua|*.lua|PHP|*.php|SQL|*.sql|Visual Basic|*.vb|XML|*.xml|All Files|*";
+        public static readonly string ExportFileDialogFilter            = "RTF|*.rtf|HTML|*.html;*.htm";
+        public static readonly string CloseUnsavedFileMessageBoxText    = "Do you want to save changes made to this tab?";
+        public static readonly string ResetSettingsMessageBoxText       = "Are you sure you want to reset all settings to their default values? This will also clear your recent files history! This action cannot be undone!";
+        public static readonly string FailedToAutoDetectMessageBoxText  = "Failed to auto-detect the language.";
+        public static readonly string FailedToAutoFormatMessageBoxText  = "No auto-formatting is available for this language.";
+        public static readonly string WebsiteURL                        = "https://www.redj.me/";
+    }
+}
