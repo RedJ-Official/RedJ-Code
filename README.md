@@ -6,4 +6,4 @@ RedJ Code is based on a [fork](https://github.com/RedJ-Official/ImprovedFastColo
 
 ### Download
 
-You can download the relase version at [our official Website](https://www.redj.me/products/code/).
+You can download the relase version at [our official Website](https://www.redj.me/code/).
