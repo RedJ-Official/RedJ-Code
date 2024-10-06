@@ -28,85 +28,90 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.prefixTextBox = new System.Windows.Forms.TextBox();
-            this.cancelButton = new System.Windows.Forms.Button();
-            this.acceptButton = new System.Windows.Forms.Button();
-            this.insertRadioButton = new System.Windows.Forms.RadioButton();
-            this.removeRadioButton = new System.Windows.Forms.RadioButton();
-            this.SuspendLayout();
+            prefixTextBox = new System.Windows.Forms.TextBox();
+            cancelButton = new System.Windows.Forms.Button();
+            acceptButton = new System.Windows.Forms.Button();
+            insertRadioButton = new System.Windows.Forms.RadioButton();
+            removeRadioButton = new System.Windows.Forms.RadioButton();
+            SuspendLayout();
             // 
             // prefixTextBox
             // 
-            this.prefixTextBox.Location = new System.Drawing.Point(12, 12);
-            this.prefixTextBox.Name = "prefixTextBox";
-            this.prefixTextBox.Size = new System.Drawing.Size(379, 27);
-            this.prefixTextBox.TabIndex = 0;
+            prefixTextBox.Location = new System.Drawing.Point(12, 11);
+            prefixTextBox.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            prefixTextBox.Name = "prefixTextBox";
+            prefixTextBox.Size = new System.Drawing.Size(332, 23);
+            prefixTextBox.TabIndex = 0;
             // 
             // cancelButton
             // 
-            this.cancelButton.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.cancelButton.Location = new System.Drawing.Point(397, 47);
-            this.cancelButton.Name = "cancelButton";
-            this.cancelButton.Size = new System.Drawing.Size(94, 29);
-            this.cancelButton.TabIndex = 4;
-            this.cancelButton.Text = "Cancel";
-            this.cancelButton.UseVisualStyleBackColor = true;
+            cancelButton.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+            cancelButton.Location = new System.Drawing.Point(353, 38);
+            cancelButton.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            cancelButton.Name = "cancelButton";
+            cancelButton.Size = new System.Drawing.Size(75, 23);
+            cancelButton.TabIndex = 4;
+            cancelButton.Text = "Cancel";
+            cancelButton.UseVisualStyleBackColor = true;
             // 
             // acceptButton
             // 
-            this.acceptButton.DialogResult = System.Windows.Forms.DialogResult.OK;
-            this.acceptButton.Location = new System.Drawing.Point(397, 12);
-            this.acceptButton.Name = "acceptButton";
-            this.acceptButton.Size = new System.Drawing.Size(94, 29);
-            this.acceptButton.TabIndex = 3;
-            this.acceptButton.Text = "OK";
-            this.acceptButton.UseVisualStyleBackColor = true;
+            acceptButton.DialogResult = System.Windows.Forms.DialogResult.OK;
+            acceptButton.Location = new System.Drawing.Point(353, 11);
+            acceptButton.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            acceptButton.Name = "acceptButton";
+            acceptButton.Size = new System.Drawing.Size(75, 23);
+            acceptButton.TabIndex = 3;
+            acceptButton.Text = "OK";
+            acceptButton.UseVisualStyleBackColor = true;
             // 
             // insertRadioButton
             // 
-            this.insertRadioButton.AutoSize = true;
-            this.insertRadioButton.Checked = true;
-            this.insertRadioButton.Location = new System.Drawing.Point(12, 49);
-            this.insertRadioButton.Name = "insertRadioButton";
-            this.insertRadioButton.Size = new System.Drawing.Size(66, 24);
-            this.insertRadioButton.TabIndex = 1;
-            this.insertRadioButton.TabStop = true;
-            this.insertRadioButton.Text = "&Insert";
-            this.insertRadioButton.UseVisualStyleBackColor = true;
+            insertRadioButton.AutoSize = true;
+            insertRadioButton.Checked = true;
+            insertRadioButton.Location = new System.Drawing.Point(12, 40);
+            insertRadioButton.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            insertRadioButton.Name = "insertRadioButton";
+            insertRadioButton.Size = new System.Drawing.Size(54, 19);
+            insertRadioButton.TabIndex = 1;
+            insertRadioButton.TabStop = true;
+            insertRadioButton.Text = "&Insert";
+            insertRadioButton.UseVisualStyleBackColor = true;
             // 
             // removeRadioButton
             // 
-            this.removeRadioButton.AutoSize = true;
-            this.removeRadioButton.Location = new System.Drawing.Point(84, 49);
-            this.removeRadioButton.Name = "removeRadioButton";
-            this.removeRadioButton.Size = new System.Drawing.Size(84, 24);
-            this.removeRadioButton.TabIndex = 2;
-            this.removeRadioButton.Text = "&Remove";
-            this.removeRadioButton.UseVisualStyleBackColor = true;
+            removeRadioButton.AutoSize = true;
+            removeRadioButton.Location = new System.Drawing.Point(72, 40);
+            removeRadioButton.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            removeRadioButton.Name = "removeRadioButton";
+            removeRadioButton.Size = new System.Drawing.Size(68, 19);
+            removeRadioButton.TabIndex = 2;
+            removeRadioButton.Text = "&Remove";
+            removeRadioButton.UseVisualStyleBackColor = true;
             // 
-            // InsertLinePrefixDialog
+            // LinePrefixDialog
             // 
-            this.AcceptButton = this.acceptButton;
-            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 20F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.CancelButton = this.cancelButton;
-            this.ClientSize = new System.Drawing.Size(503, 88);
-            this.Controls.Add(this.removeRadioButton);
-            this.Controls.Add(this.insertRadioButton);
-            this.Controls.Add(this.prefixTextBox);
-            this.Controls.Add(this.cancelButton);
-            this.Controls.Add(this.acceptButton);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedToolWindow;
-            this.MaximizeBox = false;
-            this.MinimizeBox = false;
-            this.Name = "InsertLinePrefixDialog";
-            this.ShowIcon = false;
-            this.ShowInTaskbar = false;
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "Line Prefix";
-            this.ResumeLayout(false);
-            this.PerformLayout();
-
+            AcceptButton = acceptButton;
+            AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
+            AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            CancelButton = cancelButton;
+            ClientSize = new System.Drawing.Size(440, 72);
+            Controls.Add(removeRadioButton);
+            Controls.Add(insertRadioButton);
+            Controls.Add(prefixTextBox);
+            Controls.Add(cancelButton);
+            Controls.Add(acceptButton);
+            FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedToolWindow;
+            Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            MaximizeBox = false;
+            MinimizeBox = false;
+            Name = "LinePrefixDialog";
+            ShowIcon = false;
+            ShowInTaskbar = false;
+            StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+            Text = "Line Prefix";
+            ResumeLayout(false);
+            PerformLayout();
         }
 
         #endregion

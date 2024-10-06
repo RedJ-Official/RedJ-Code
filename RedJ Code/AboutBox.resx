@@ -622,8 +622,10 @@
   <data name="textBoxDescription.Text" xml:space="preserve">
     <value>RedJ Code is a lightweight code editor for Windows, written by Zaro Kavelar in the C# programming language.
 
-Based on a modified version of Pavel Torgashov's FastColoredTextBox.
+Based on a fork of Pavel Torgashov's FastColoredTextBox.
 
+https://github.com/RedJ-Official/RedJ-Code
+https://github.com/RedJ-Official/ImprovedFastColoredTextBox
 https://github.com/PavelTorgashov/FastColoredTextBox</value>
   </data>
 </root>

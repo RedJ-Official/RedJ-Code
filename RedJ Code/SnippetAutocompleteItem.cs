@@ -13,18 +13,15 @@ namespace RedJ_Code
         public Language[] Languages { get; set; }
         public FastColoredTextBox FCTB { get; set; }
 
-        public SnippetAutocompleteItem(FastColoredTextBox fctb, string snippet, params Language[] languages) : this(fctb, snippet, snippet, languages)
-        {
-        }
-
-        public SnippetAutocompleteItem(FastColoredTextBox fctb, string name, string snippet, params Language[] languages)
+        public SnippetAutocompleteItem(FastColoredTextBox fctb, string name, string snippet, Language[] languages, int imageIndex)
         {
             Languages = languages;
             FCTB = fctb;
             MenuText = name;
             Text = snippet;
-            ToolTipTitle = "Code snippet:";
-            ToolTipText = Text.Replace("^", "");
+            ImageIndex = imageIndex;
+            ToolTipTitle = "Snippet:";
+            ToolTipText = Text.Replace("^", string.Empty);
         }
 
         public override string ToString()

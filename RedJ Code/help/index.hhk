@@ -5,5 +5,54 @@
 <!-- Sitemap 1.0 -->
 </HEAD><BODY>
 <UL>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="about">
+		<param name="Local" value="about.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="clipboard">
+		<param name="Local" value="edit.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="edit">
+		<param name="Local" value="edit.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="export">
+		<param name="Local" value="file-export.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="features">
+		<param name="Local" value="features.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="file">
+		<param name="Local" value="file.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="indent">
+		<param name="Local" value="edit.htm">
+		<param name="Local" value="view.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="print">
+		<param name="Local" value="file.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="tools">
+		<param name="Local" value="tools.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="undo">
+		<param name="Local" value="edit.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="view">
+		<param name="Local" value="view.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="word wrap">
+		<param name="Local" value="view.htm">
+		</OBJECT>
 </UL>
 </BODY></HTML>

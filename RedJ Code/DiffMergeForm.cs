@@ -23,8 +23,8 @@ namespace RedJ_Code
             greenStyle = new MarkerStyle(new SolidBrush(Color.FromArgb(50, Color.Lime)));
             redStyle = new MarkerStyle(new SolidBrush(Color.FromArgb(50, Color.Red)));
 
-            fctb1.Hotkeys = StringTable.ReadOnlyFastColoredTextBoxHotkeys;
-            fctb2.Hotkeys = StringTable.ReadOnlyFastColoredTextBoxHotkeys;
+            fctb1.Hotkeys = StringTable.TerminalFastColoredTextBoxHotkeys;
+            fctb2.Hotkeys = StringTable.TerminalFastColoredTextBoxHotkeys;
 
             ofdFile.Filter = StringTable.OpenFileDialogFilter;
         }

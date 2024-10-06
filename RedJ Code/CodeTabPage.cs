@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -8,13 +9,14 @@ using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using System.Xml.Linq;
 using FastColoredTextBoxNS;
 
 namespace RedJ_Code
 {
     internal class CodeTabPage : TabPage 
     {
-        private Form ParentForm => FindForm();
+        private MainForm ParentForm => FindForm() as MainForm;
 
         private readonly FastColoredTextBox FastColoredTextBox;
         private readonly DocumentMap DocumentMap;
@@ -24,9 +26,11 @@ namespace RedJ_Code
         private List<SnippetAutocompleteItem> AutocompleteItems;
 
         private readonly MarkerStyle SameWordsStyle = new MarkerStyle(new SolidBrush(Color.FromArgb(40, Color.Gray)));
-        
+        private readonly InvisibleCharsStyle InvisCharStyle = new InvisibleCharsStyle(Pens.LightGray);
+
         public string? FilePath { get; private set; }
         public bool IsSaved { get; set; }
+        //public bool IsSaved => !FastColoredTextBox.IsChanged;
         
         public bool AutoSave { get; set; }
 
@@ -39,12 +43,17 @@ namespace RedJ_Code
         public bool CanPaste => Clipboard.ContainsText();
         public bool CanSelectAll => FastColoredTextBox.TextLength > 0;
 
+        public Encoding Encoding { get; private set; }
+        public bool ReadOnly { get; }
+
         public Language Language
         {
             get { return FastColoredTextBox.Language; }
             set {
                 FastColoredTextBox.Language = value;
                 RefreshSyntaxHighlighting();
+                if (ParentForm is MainForm mf)
+                    mf.RefreshLanguage();
             }
         }
         public bool WordWrap
@@ -122,15 +131,98 @@ namespace RedJ_Code
             get { return FastColoredTextBox.VirtualSpace; }
             set { FastColoredTextBox.VirtualSpace = value; }
         }
+        public bool AllowDragDrop
+        {
+            get { return FastColoredTextBox.AllowDrop; }
+            set { FastColoredTextBox.AllowDrop = value; }
+        }
+        public bool HighlightFoldingIndicator
+        {
+            get { return FastColoredTextBox.HighlightFoldingIndicator; }
+            set { FastColoredTextBox.HighlightFoldingIndicator = value; }
+        }
+        private bool _highlightCurrentLine;
         public bool HighlightCurrentLine
         {
-            get { return FastColoredTextBox.CurrentLineColor != Color.Transparent; }
-            set { FastColoredTextBox.CurrentLineColor = value ? Color.LightBlue : Color.Transparent; }
+            //get { return FastColoredTextBox.CurrentLineColor != Color.Transparent; }
+            //set { FastColoredTextBox.CurrentLineColor = value ? Color.LightBlue : Color.Transparent; }
+            get { return _highlightCurrentLine; }
+            set
+            {
+                _highlightCurrentLine = value;
+                FastColoredTextBox.CurrentLineColor = _highlightCurrentLine ? _currentLineColor : Color.Transparent;
+            }
         }
+        private bool _highlightCurrentWord;
         public bool HighlightCurrentWord
         {
-            get;
-            set;
+            get => _highlightCurrentWord;
+            set {
+                if (value) DoHighlightCurrentWord();
+                else FastColoredTextBox.Range.ClearStyle(SameWordsStyle);
+                _highlightCurrentWord = value;
+            }
+        }
+        private bool _showInvisibleChars;
+        public bool ShowInvisibleChars
+        {
+            get => _showInvisibleChars;
+            set
+            {
+                _showInvisibleChars = value;
+                RefreshInvisibleCharsHighlight();
+            }
+        }
+        public Color LineNumberColor
+        {
+            get => FastColoredTextBox.LineNumberColor;
+            set => FastColoredTextBox.LineNumberColor = value;
+        }
+        public Color BookmarkColor
+        {
+            get => FastColoredTextBox.BookmarkColor;
+            set => FastColoredTextBox.BookmarkColor = value;
+        }
+        public Color FoldingIndicatorColor
+        {
+            get => FastColoredTextBox.FoldingIndicatorColor;
+            set => FastColoredTextBox.FoldingIndicatorColor = value;
+        }
+        private Color _currentLineColor = Color.Transparent;
+        public Color CurrentLineColor
+        {
+            get { 
+                return _currentLineColor;
+            }
+            set {
+                _currentLineColor = value;
+                FastColoredTextBox.CurrentLineColor = _highlightCurrentLine ? _currentLineColor : Color.Transparent;
+            }
+        }
+        public Color DocumentMapColor
+        {
+            get => DocumentMap.ForeColor;
+            set => DocumentMap.ForeColor = value;
+        }
+        public Color AutocompleteMenuColor
+        {
+            get => AutocompleteMenu.SelectedColor;
+            set => AutocompleteMenu.SelectedColor = value;
+        }
+        public Color BackgroundColor
+        {
+            get => FastColoredTextBox.BackColor;
+            set => FastColoredTextBox.BackColor = value;
+        }
+        public Color SelectionColor
+        {
+            get => FastColoredTextBox.SelectionColor;
+            set => FastColoredTextBox.SelectionColor = value;
+        }
+        public int Zoom
+        {
+            get { return FastColoredTextBox.Zoom; }
+            set { if (FastColoredTextBox.Zoom != value) FastColoredTextBox.Zoom = value; }
         }
         public Font TextFont
         {
@@ -160,63 +252,77 @@ namespace RedJ_Code
         public int CurrentColumn => FastColoredTextBox.Selection.Start.iChar;
 
         public event EventHandler? CodeChanged;
+        public event EventHandler? ZoomChanged;
 
-        public CodeTabPage() : this(null)
+        public CodeTabPage(string? filePath = null, bool readOnly = false) : base()
         {
-        }
-
-        public CodeTabPage(string? filePath) : base()
-        {
+            Encoding = new UTF8Encoding(false);
             FilePath = filePath;
+            ReadOnly = readOnly;
             IsSaved  = true;
-
-            FastColoredTextBox = new FastColoredTextBox(); 
-            FastColoredTextBox.Dock = DockStyle.Fill;
-            FastColoredTextBox.Hotkeys = StringTable.FastColoredTextBoxHotkeys;
-            FastColoredTextBox.LeftPadding = 32;
-            FastColoredTextBox.BookmarkColor = Color.Blue;
-            FastColoredTextBox.Language = Language.PlainText;
-            FastColoredTextBox.TextChanged += new EventHandler<TextChangedEventArgs>(fastColoredTextBox_TextChanged);
-            FastColoredTextBox.SelectionChanged += new EventHandler(fastColoredTextBox_SelectionChanged);
-            FastColoredTextBox.SelectionChangedDelayed += new EventHandler(fastColoredTextBox_SelectionChangedDelayed);
             
-            DocumentMap = new DocumentMap();
-            DocumentMap.Dock = DockStyle.Right;
-            DocumentMap.Width = 200;
-            DocumentMap.ForeColor = Color.Blue;
-            DocumentMap.ScrollbarVisible = true;
-            DocumentMap.Target = FastColoredTextBox;
+            FastColoredTextBox = new FastColoredTextBox
+            {
+                Dock = DockStyle.Fill,
+                Hotkeys = StringTable.FastColoredTextBoxHotkeys,
+                LeftPadding = 32,
+                BookmarkColor = Color.Blue,
+                DelayedEventsInterval = 200,
+                DelayedTextChangedInterval = 1000,
+                Language = Language.PlainText,
+                HighlightingRangeType = HighlightingRangeType.VisibleRange,
+                ReadOnly = ReadOnly
+            };
+            FastColoredTextBox.TextChanged += FastColoredTextBox_TextChanged;
+            FastColoredTextBox.TextChangedDelayed += FastColoredTextBox_TextChangedDelayed;
+            //FastColoredTextBox.SelectionChanged += FastColoredTextBox_SelectionChanged;
+            FastColoredTextBox.SelectionChangedDelayed += FastColoredTextBox_SelectionChangedDelayed;
+            FastColoredTextBox.VisibleRangeChangedDelayed += FastColoredTextBox_VisibleRangeChangedDelayed;
+            FastColoredTextBox.ZoomChanged += FastColoredTextBox_ZoomChanged;
+            FastColoredTextBox.CustomAction += FastColoredTextBox_CustomAction;
 
-            Ruler = new Ruler();
-            Ruler.Dock = DockStyle.Top;
-            Ruler.Target = FastColoredTextBox;
+            DocumentMap = new DocumentMap
+            {
+                Dock = DockStyle.Right,
+                Width = 200,
+                ForeColor = Color.Blue,
+                ScrollbarVisible = true,
+                Target = FastColoredTextBox
+            };
 
-            AutocompleteMenu = new AutocompleteMenu(FastColoredTextBox);
-            AutocompleteMenu.AutoClose = true;
-            AutocompleteMenu.AllowTabKey = true;
-            AutocompleteMenu.MinFragmentLength = 1;
-            AutocompleteMenu.AppearInterval = 1000;
-            AutocompleteMenu.SelectedColor = Color.CornflowerBlue;
-            AutocompleteMenu.Font = FastColoredTextBox.Font;
-            AutocompleteMenu.SearchPattern = @"[<?\w]"; 
+            Ruler = new Ruler
+            {
+                Dock = DockStyle.Top,
+                Target = FastColoredTextBox
+            };
+
+            AutocompleteMenu = new AutocompleteMenu(FastColoredTextBox)
+            {
+                AutoClose = true,
+                AllowTabKey = true,
+                MinFragmentLength = 1,
+                AppearInterval = 1000,
+                SelectedColor = Color.CornflowerBlue,
+                Font = FastColoredTextBox.Font,
+                SearchPattern = @"<?\w+"
+            };
             InitAutocompleteItems();
             AutocompleteMenu.Items.SetAutocompleteItems(AutocompleteItems);
+
+            Resize += CodeTabPage_Resize;
             
             Controls.Add(FastColoredTextBox);
             Controls.Add(Ruler);
             Controls.Add(DocumentMap);
 
             RefreshSyntaxHighlighting();
-            
-            if (FilePath != null)
-            {
-                FastColoredTextBox.OpenFile(FilePath);
-            }
 
-            IsSaved = true;
+            Open();
+
             RefreshText();
         }
 
+        [MemberNotNull(nameof(AutocompleteItems))]
         private void InitAutocompleteItems()
         {
             AutocompleteItems = new()
@@ -243,8 +349,8 @@ namespace RedJ_Code
                 NewAutocompleteItem("ulong"         , Language.CSharp),
                 NewAutocompleteItem("ushort"        , Language.CSharp),
                 NewAutocompleteItem("var"           , Language.CSharp, Language.JS),
+                NewAutocompleteItem("const"         , Language.CSharp, Language.JS),
                 NewAutocompleteItem("let"           , Language.JS),
-                NewAutocompleteItem("const"         , Language.JS),
                 NewAutocompleteItem("function"      , "function ^()\n{\n\n}"                    , Language.JS),
 
                 NewAutocompleteItem("if"            , "if (^)\n{\n\n}"                          , Language.CSharp, Language.JS),
@@ -272,6 +378,49 @@ namespace RedJ_Code
                 NewAutocompleteItem("throw "        , "throw ^;"                                , Language.CSharp, Language.JS),
                 NewAutocompleteItem("break"         , "break;"                                  , Language.CSharp, Language.JS),
                 NewAutocompleteItem("continue"      , "continue;"                               , Language.CSharp, Language.JS),
+                NewAutocompleteItem("yield return"  , "yield return ^;"                         , Language.CSharp),
+                NewAutocompleteItem("yield break"   , "yield break;"                            , Language.CSharp),
+
+                NewAutocompleteItem("nameof"        , "nameof(^)"                               , Language.CSharp),
+                NewAutocompleteItem("typeof"        , "typeof(^)"                               , Language.CSharp),
+                NewAutocompleteItem("sizeof"        , "sizeof(^)"                               , Language.CSharp),
+
+                NewAutocompleteItem("abstract"      , Language.CSharp),
+                NewAutocompleteItem("as"            , Language.CSharp),
+                NewAutocompleteItem("async"         , Language.CSharp),
+                NewAutocompleteItem("await"         , Language.CSharp),
+                NewAutocompleteItem("case"          , Language.CSharp),
+                NewAutocompleteItem("class"         , Language.CSharp),
+                NewAutocompleteItem("default"       , Language.CSharp),
+                NewAutocompleteItem("delegate"      , Language.CSharp),
+                NewAutocompleteItem("dynamic"       , Language.CSharp),
+                NewAutocompleteItem("enum"          , Language.CSharp),
+                NewAutocompleteItem("event"         , Language.CSharp),
+                NewAutocompleteItem("explicit"      , Language.CSharp),
+                NewAutocompleteItem("extern"        , Language.CSharp),
+                NewAutocompleteItem("global"        , Language.CSharp),
+                NewAutocompleteItem("goto"          , Language.CSharp),
+                NewAutocompleteItem("implicit"      , Language.CSharp),
+                NewAutocompleteItem("interface"     , Language.CSharp),
+                NewAutocompleteItem("internal"      , Language.CSharp),
+                NewAutocompleteItem("in"            , Language.CSharp),
+                NewAutocompleteItem("is"            , Language.CSharp),
+                NewAutocompleteItem("namespace"     , Language.CSharp),
+                NewAutocompleteItem("new"           , Language.CSharp),
+                NewAutocompleteItem("operator"      , Language.CSharp),
+                NewAutocompleteItem("out"           , Language.CSharp),
+                NewAutocompleteItem("params"        , Language.CSharp),
+                NewAutocompleteItem("private"       , Language.CSharp),
+                NewAutocompleteItem("protected"     , Language.CSharp),
+                NewAutocompleteItem("public"        , Language.CSharp),
+                NewAutocompleteItem("readonly"      , Language.CSharp),
+                NewAutocompleteItem("ref"           , Language.CSharp),
+                NewAutocompleteItem("ref struct"    , Language.CSharp),
+                NewAutocompleteItem("struct"        , Language.CSharp),
+                NewAutocompleteItem("using"         , Language.CSharp),
+                NewAutocompleteItem("virtual"       , Language.CSharp),
+                NewAutocompleteItem("void"          , Language.CSharp),
+                NewAutocompleteItem("volatile"      , Language.CSharp),
 
                 NewAutocompleteItem("<!-->"         , "<!-- ^ -->"                              , Language.HTML),
                 NewAutocompleteItem("<!DOCTYPE>"    , "<!DOCTYPE html>"                         , Language.HTML),
@@ -285,7 +434,7 @@ namespace RedJ_Code
                 NewAutocompleteItem("<big>"         , "<big>^</big>"                            , Language.HTML),
                 NewAutocompleteItem("<blockquote>"  , "<blockquote>^</blockquote>"              , Language.HTML),
                 NewAutocompleteItem("<body>"        , "<body>\n^\n</body>"                      , Language.HTML),
-                NewAutocompleteItem("<br>"          , "<br />"                                  , Language.HTML),
+                NewAutocompleteItem("<br>"          , "<br>"                                    , Language.HTML),
                 NewAutocompleteItem("<button>"      , "<button>^</button>"                      , Language.HTML),
                 NewAutocompleteItem("<canvas>"      , "<canvas>^</canvas>"                      , Language.HTML),
                 NewAutocompleteItem("<center>"      , "<center>^</center>"                      , Language.HTML),
@@ -302,7 +451,7 @@ namespace RedJ_Code
                 NewAutocompleteItem("<dl>"          , "<dl>^</dl>"                              , Language.HTML),
                 NewAutocompleteItem("<dt>"          , "<dt>^</dt>"                              , Language.HTML),
                 NewAutocompleteItem("<em>"          , "<em>^</em>"                              , Language.HTML),
-                NewAutocompleteItem("<embed>"       , "<embed src=\"^\" type=\"\" />"           , Language.HTML),
+                NewAutocompleteItem("<embed>"       , "<embed src=\"^\" type=\"\">"             , Language.HTML),
                 NewAutocompleteItem("<fieldset>"    , "<fieldset>\n^\n</fieldset>"              , Language.HTML),
                 NewAutocompleteItem("<figure>"      , "<figure>\n<img src=\"^\" alt=\"\" />\n<figcaption></figcaption>\n</figure>", Language.HTML),
                 NewAutocompleteItem("<figcaption>"  , "<figcaption>^</figcaption>"              , Language.HTML),
@@ -320,13 +469,13 @@ namespace RedJ_Code
                 NewAutocompleteItem("<head>"        , "<head>\n^\n</head>"                      , Language.HTML),
                 NewAutocompleteItem("<header>"      , "<header>\n^\n</header>"                  , Language.HTML),
                 NewAutocompleteItem("<hgroup>"      , "<hgroup>\n^\n</hgroup>"                  , Language.HTML),
-                NewAutocompleteItem("<hr>"          , "<hr />"                                  , Language.HTML),
+                NewAutocompleteItem("<hr>"          , "<hr>"                                    , Language.HTML),
                 NewAutocompleteItem("<html>"        , "<html>\n^\n</html>"                      , Language.HTML),
                 NewAutocompleteItem("<i>"           , "<i>^</i>"                                , Language.HTML),
                 NewAutocompleteItem("<iframe>"      , "<iframe src=\"^\"></iframe>"             , Language.HTML),
                 NewAutocompleteItem("<img>"         , "<img src=\"^\" alt=\"\" />"              , Language.HTML),
                 NewAutocompleteItem("<ins>"         , "<ins>^</ins>"                            , Language.HTML),
-                NewAutocompleteItem("<input>"       , "<input type=\"^\" />"                    , Language.HTML),
+                NewAutocompleteItem("<input>"       , "<input type=\"^\">"                      , Language.HTML),
                 NewAutocompleteItem("<kbd>"         , "<kbd>^</kbd>"                            , Language.HTML),
                 NewAutocompleteItem("<label>"       , "<label for=\"^\"></label>"               , Language.HTML),
                 NewAutocompleteItem("<legend>"      , "<legend>^</legend>"                      , Language.HTML),
@@ -336,11 +485,11 @@ namespace RedJ_Code
                 NewAutocompleteItem("<mark>"        , "<mark>^</mark>"                          , Language.HTML),
                 NewAutocompleteItem("<marquee>"     , "<marquee>^</marquee>"                    , Language.HTML),
                 NewAutocompleteItem("<menu>"        , "<menu>\n^\n</menu>"                      , Language.HTML),
-                NewAutocompleteItem("<meta>"        , "<meta ^ />"                              , Language.HTML),
+                NewAutocompleteItem("<meta>"        , "<meta ^>"                                , Language.HTML),
                 NewAutocompleteItem("<meter>"       , "<meter value=\"^\" min=\"\" max=\"\" low=\"\" optimum=\"\" high=\"\"></meter>", Language.HTML),
                 NewAutocompleteItem("<nav>"         , "<nav>\n^\n</nav>"                        , Language.HTML),
                 NewAutocompleteItem("<nobr>"        , "<nobr>^</nobr>"                          , Language.HTML),
-                NewAutocompleteItem("<noembed>"     , "<noémbed>^</noembed>"                    , Language.HTML),
+                NewAutocompleteItem("<noembed>"     , "<noembed>^</noembed>"                    , Language.HTML),
                 NewAutocompleteItem("<noframes>"    , "<noframes>^</noframes>"                  , Language.HTML),
                 NewAutocompleteItem("<noscript>"    , "<noscript>^</noscript>"                  , Language.HTML),
                 NewAutocompleteItem("<object>"      , "<object>^</object>"                      , Language.HTML),
@@ -349,7 +498,7 @@ namespace RedJ_Code
                 NewAutocompleteItem("<option>"      , "<option value=\"^\"></option>"           , Language.HTML),
                 NewAutocompleteItem("<output>"      , "<output for=\"^\"></output>"             , Language.HTML),
                 NewAutocompleteItem("<p>"           , "<p>^</p>"                                , Language.HTML),
-                NewAutocompleteItem("<param>"       , "<param name=\"^\" value=\"\" />"         , Language.HTML),
+                NewAutocompleteItem("<param>"       , "<param name=\"^\" value=\"\">"           , Language.HTML),
                 NewAutocompleteItem("<picture>"     , "<picture>\n<source srcset=\"^\" media=\"\" />\n<img src=\"\" alt=\"\" />\n</picture>", Language.HTML),
                 NewAutocompleteItem("<plaintext>"   , "<plaintext>\n^"                          , Language.HTML),
                 NewAutocompleteItem("<pre>"         , "<pre>^</pre>"                            , Language.HTML),
@@ -358,7 +507,7 @@ namespace RedJ_Code
                 NewAutocompleteItem("<s>"           , "<s>^</s>"                                , Language.HTML),
                 NewAutocompleteItem("<script>"      , "<script>^</script>"                      , Language.HTML),
                 NewAutocompleteItem("<select>"      , "<select>\n^\n</select>"                  , Language.HTML),
-                NewAutocompleteItem("<source>"      , "<source src=\"^\" type=\"\" />"          , Language.HTML),
+                NewAutocompleteItem("<source>"      , "<source src=\"^\" type=\"\">"            , Language.HTML),
                 NewAutocompleteItem("<span>"        , "<span>^</span>"                          , Language.HTML),
                 NewAutocompleteItem("<strike>"      , "<strike>^</strike>"                      , Language.HTML),
                 NewAutocompleteItem("<strong>"      , "<strong>^</strong>"                      , Language.HTML),
@@ -374,7 +523,7 @@ namespace RedJ_Code
                 NewAutocompleteItem("<th>"          , "<th>^</th>"                              , Language.HTML),
                 NewAutocompleteItem("<thead>"       , "<thead>\n^\n</thead>"                    , Language.HTML),
                 NewAutocompleteItem("<title>"       , "<title>^</title>"                        , Language.HTML),
-                NewAutocompleteItem("<tr>"          , "<tr>^</tr>"                              , Language.HTML),
+                NewAutocompleteItem("<tr>"          , "<tr>\n^\n</tr>"                          , Language.HTML),
                 NewAutocompleteItem("<tt>"          , "<tt>^</tt>"                              , Language.HTML),
                 NewAutocompleteItem("<u>"           , "<u>^</u>"                                , Language.HTML),
                 NewAutocompleteItem("<ul>"          , "<ul>\n^\n</ul>"                          , Language.HTML),
@@ -382,55 +531,97 @@ namespace RedJ_Code
                 NewAutocompleteItem("<viedo>"       , "<video controls=\"controls\">\n<source src=\"^\" type=\"\" />\n</video>", Language.HTML),
                 
             };
+
+            AutocompleteItems.Sort((a, b) => a.MenuText.CompareTo(b.MenuText));
         }
 
-        private SnippetAutocompleteItem NewAutocompleteItem(string name, string snippet, params Language[] languages) => new SnippetAutocompleteItem(FastColoredTextBox, name, snippet, languages);
-        private SnippetAutocompleteItem NewAutocompleteItem(string snippet, params Language[] languages) => NewAutocompleteItem(snippet, snippet, languages);
+        private SnippetAutocompleteItem NewAutocompleteItem(string name, string snippet, params Language[] languages) => 
+            new (FastColoredTextBox, name, snippet, languages, 13);
+        private SnippetAutocompleteItem NewAutocompleteItem(string snippet, params Language[] languages) => 
+            new (FastColoredTextBox, snippet, snippet, languages, -1);
 
         protected virtual void OnCodeChanged()
         {
             CodeChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        private void fastColoredTextBox_TextChanged(object? sender, TextChangedEventArgs e)
+        protected virtual void OnZoomChanged()
+        {
+            ZoomChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void FastColoredTextBox_TextChanged(object? sender, TextChangedEventArgs e)
         {
             IsSaved = false;
+            if (FastColoredTextBox.FindDialogForm != null)
+                FastColoredTextBox.FindDialogForm.ClearMarker();
+            if (FastColoredTextBox.ReplaceDialogForm != null)
+                FastColoredTextBox.ReplaceDialogForm.ClearMarker();
             RefreshText();
+            DoHighlightInvisibleChars(e.ChangedRange);
             OnCodeChanged();
-            if (AutoSave && FilePath != null)
+            //if (AutoSave && FilePath != null)
+            //{
+            //    Save();
+            //}
+        }
+
+        private void FastColoredTextBox_ZoomChanged(object? sender, EventArgs e)
+        {
+            OnZoomChanged();
+        }
+
+        private void FastColoredTextBox_SelectionChanged(object? sender, EventArgs e)
+        {
+            //OnCodeChanged();
+        }
+
+        private void FastColoredTextBox_SelectionChangedDelayed(object? sender, EventArgs e)
+        {
+            if (HighlightCurrentWord) DoHighlightCurrentWord();
+        }
+
+        private void FastColoredTextBox_VisibleRangeChangedDelayed(object? sender, EventArgs e)
+        {
+            //FastColoredTextBox.OnSyntaxHighlight(new TextChangedEventArgs(FastColoredTextBox.VisibleRange));
+            FastColoredTextBox.SyntaxHighlighter.HighlightSyntax(FastColoredTextBox.Language, FastColoredTextBox.VisibleRange);
+        }
+
+        private void FastColoredTextBox_TextChangedDelayed(object? sender, TextChangedEventArgs e)
+        {
+            if (ShowInvisibleChars) DoHighlightInvisibleChars(e.ChangedRange);
+        }
+
+        private void FastColoredTextBox_CustomAction(object? sender, CustomActionEventArgs e)
+        {
+            switch (e.Action)
             {
-                Save();
+                case FCTBAction.CustomAction1:
+                    InsertCommentPrefix();
+                    break;
+                case FCTBAction.CustomAction2:
+                    RemoveCommentPrefix();
+                    break;
+                case FCTBAction.CustomAction3:
+                    InsertXmlTag(false);
+                    break;
+                case FCTBAction.CustomAction4:
+                    InsertXmlTag(true);
+                    break;
+                case FCTBAction.CustomAction5:
+                    DoAutoIndent();
+                    break;
             }
         }
 
-        private void fastColoredTextBox_SelectionChangedDelayed(object? sender, EventArgs e)
+        private void CodeTabPage_Resize(object? sender, EventArgs e)
         {
-            FastColoredTextBox./*Visible*/Range.ClearStyle(SameWordsStyle);
-
-            if (!HighlightCurrentWord || !FastColoredTextBox.Selection.IsEmpty)
+            DocumentMap.Width = Width switch
             {
-                return; //user selected diapason
-            }
-
-            //get fragment around caret
-            var fragment = FastColoredTextBox.Selection.GetFragment(@"\w");
-            string text = fragment.Text;
-            if (text.Length == 0)
-            {
-                return;
-            }
-
-            //highlight same words
-            var ranges = FastColoredTextBox./*Visible*/Range.GetRanges($@"\b{text}\b").ToArray();
-            foreach (var r in ranges)
-            {
-                r.SetStyle(SameWordsStyle);
-            }
-        }
-
-        private void fastColoredTextBox_SelectionChanged(object? sender, EventArgs e)
-        {
-            OnCodeChanged();
+                < 256  =>         0,
+                < 1024 =>       128,
+                _      => Width / 8
+            };
         }
 
         public void SetContextMenu(ContextMenuStrip contextMenu)
@@ -468,49 +659,104 @@ namespace RedJ_Code
             FastColoredTextBox.SyntaxHighlighter.HighlightSyntax(FastColoredTextBox.Language, FastColoredTextBox.Range);
         }
 
-        public void AutoDetectLanguage()
+        public Language AutoDetectLanguage(bool verbose)
         {
-            Language = DoAutoDetectLanguage();
-        }
+            Language lang = FastColoredTextBox.AutoDetectLanguage();
 
-        private Language DoAutoDetectLanguage()
-        {
-            string? line1 = FastColoredTextBox.Lines.Where(l => !string.IsNullOrWhiteSpace(l)).FirstOrDefault()?.Trim();
-
-            if (line1 == null)
+            if (verbose && lang == Language.PlainText)
             {
                 MessageBox.Show(ParentForm, StringTable.FailedToAutoDetectMessageBoxText, ParentForm.Text);
-                return Language.PlainText;
             }
 
-            if (line1.StartsWith("<!"))
-            {
+            return lang;
+
+            /*
+            string? line1 = FastColoredTextBox.Lines.Where(l => !string.IsNullOrWhiteSpace(l)).FirstOrDefault()?.Trim();
+
+            if (line1 == null) goto end;
+
+            string line1lc = line1.ToLowerInvariant();
+
+            if (line1lc.StartsWith("<!doctype") || line1lc.StartsWith("<html")) {
                 return Language.HTML;
-            }
-            else if (line1.StartsWith("<?"))
-            {
+            } else if (line1lc.StartsWith("<?xml")) {
                 return Language.XML;
-            }
-            else if (line1.StartsWith("using") || line1.StartsWith("namespace") || line1.Contains("class") || line1.StartsWith("#region"))
-            {
+            } else if (line1lc.StartsWith("<?php")) {
+                return Language.PHP;
+            } else if (line1lc.StartsWith("@echo")) {
+                return Language.Batch;
+            } else if (line1.StartsWith("using") || line1.StartsWith("#region")) {
                 return Language.CSharp;
-            }
-            else if (line1.StartsWith("Imports") || line1.Contains("Class"))
-            {
+            } else if (line1.StartsWith("Imports") || line1.StartsWith("Module") || line1.StartsWith("#Region")) {
                 return Language.VB;
-            }
-            else if (line1.StartsWith("use", StringComparison.InvariantCultureIgnoreCase))
-            {
-                return Language.SQL;
-            }
-            else if (line1.StartsWith("{"))
-            {
+            } else if ((line1.StartsWith("import") || line1.StartsWith("package")) && line1.EndsWith(';')) {
+                return Language.Java;
+            } else if (line1.StartsWith("{")) {
                 return Language.JSON;
+            } else {
+                goto end;
+            }
+
+        end:
+            if (verbose) MessageBox.Show(ParentForm, StringTable.FailedToAutoDetectMessageBoxText, ParentForm.Text);
+            return Language.PlainText;
+            */
+        }
+
+        private void DoHighlightCurrentWord()
+        {
+            FastColoredTextBox.Range.ClearStyle(SameWordsStyle);
+
+            string fragment;
+            string pattern;
+
+            if (FastColoredTextBox.Selection.IsEmpty)
+            {
+                // get fragment around caret
+                fragment = FastColoredTextBox.Selection.GetFragment(@"\w").Text;
+
+                if (fragment.Length == 0) return;
+
+                pattern = $@"\b{fragment}\b";
             }
             else
             {
-                MessageBox.Show(ParentForm, StringTable.FailedToAutoDetectMessageBoxText, ParentForm.Text);
-                return Language.PlainText;
+                if (FastColoredTextBox.Selection.FromLine != FastColoredTextBox.Selection.ToLine) return;
+
+                fragment = FastColoredTextBox.SelectedText;
+
+                if (fragment.Trim().Length == 0) return;
+
+                pattern = Regex.Escape(fragment);
+            }
+
+            //highlight same words
+            var ranges = FastColoredTextBox.Range.GetRanges(pattern);
+            foreach (var r in ranges)
+                r.SetStyle(SameWordsStyle);
+        }
+
+        private void DoHighlightInvisibleChars(FastColoredTextBoxNS.Range range)
+        {
+            range.SetStyle(InvisCharStyle, @".$|.\r\n|\s");
+        }
+
+        private void RefreshInvisibleCharsHighlight()
+        {
+            if (ShowInvisibleChars) DoHighlightInvisibleChars(FastColoredTextBox.Range);
+            else FastColoredTextBox.Range.ClearStyle(InvisCharStyle);
+        }
+
+        public void Open()
+        {
+            if (FilePath != null)
+            {
+                if (Path.GetExtension(FilePath).Equals(".ASCII", StringComparison.InvariantCultureIgnoreCase))
+                    Encoding = Encoding.ASCII;
+                else
+                    Encoding = EncodingDetector.DetectTextFileEncoding(FilePath) ?? new UTF8Encoding(false);
+                FastColoredTextBox.OpenFile(FilePath, Encoding);
+                IsSaved = true;
             }
         }
 
@@ -522,7 +768,7 @@ namespace RedJ_Code
             }
             else
             {
-                FastColoredTextBox.SaveToFile(FilePath, Encoding.UTF8);
+                FastColoredTextBox.SaveToFile(FilePath, Encoding);
                 IsSaved = true;
                 RefreshText();
                 return true;
@@ -535,10 +781,10 @@ namespace RedJ_Code
             saveFileDialog.Title = StringTable.SaveFileDialogTitle;
             saveFileDialog.Filter = StringTable.SaveFileDialogFilter;
             saveFileDialog.FilterIndex = Util.GetFilterIndexFromLangauge(FastColoredTextBox.Language);
-            if (saveFileDialog.ShowDialog(this) == DialogResult.OK)
+            if (saveFileDialog.ShowDialog(ParentForm) == DialogResult.OK)
             {
                 FilePath = saveFileDialog.FileName;
-                FastColoredTextBox.SaveToFile(FilePath, Encoding.UTF8);
+                FastColoredTextBox.SaveToFile(FilePath, Encoding);
                 IsSaved = true;
                 RefreshText();
                 return true;
@@ -548,28 +794,32 @@ namespace RedJ_Code
 
         public void Export()
         {
-            using SaveFileDialog saveFileDialog = new SaveFileDialog();
-            saveFileDialog.Title = StringTable.ExportFileDialogTitle;
-            saveFileDialog.Filter = StringTable.ExportFileDialogFilter;
-            if (saveFileDialog.ShowDialog(this) == DialogResult.OK)
-            {
-                switch (saveFileDialog.FilterIndex)
-                {
-                    case 1:
-                        File.WriteAllText(saveFileDialog.FileName, FastColoredTextBox.Rtf);
-                        break;
-                    case 2:
-                        File.WriteAllText(saveFileDialog.FileName, FastColoredTextBox.Html);
-                        break;
-                }
-            }
+            //using SaveFileDialog saveFileDialog = new SaveFileDialog();
+            //saveFileDialog.Title = StringTable.ExportFileDialogTitle;
+            //saveFileDialog.Filter = StringTable.ExportFileDialogFilter;
+            //if (saveFileDialog.ShowDialog(this) == DialogResult.OK)
+            //{
+            //    switch (saveFileDialog.FilterIndex)
+            //    {
+            //        case 1:
+            //            File.WriteAllText(saveFileDialog.FileName, FastColoredTextBox.Rtf);
+            //            break;
+            //        case 2:
+            //            File.WriteAllText(saveFileDialog.FileName, FastColoredTextBox.Html);
+            //            break;
+            //    }
+            //}
+
+            using ExportDialog exportDialog = new ExportDialog(FastColoredTextBox);
+            exportDialog.Encoding = Encoding;
+            exportDialog.ShowDialog(ParentForm);
         }
 
         public void Reload()
         {
             if (FilePath != null)
             {
-                FastColoredTextBox.OpenFile(FilePath);
+                FastColoredTextBox.OpenFile(FilePath, Encoding);
                 IsSaved = true;
                 RefreshText();
             }
@@ -604,19 +854,67 @@ namespace RedJ_Code
 
         public void PrintRTF()
         {
-            RichTextPrinter.PrintRTF(FastColoredTextBox.Rtf);
-        }
-
-        public void PageSetupRTF()
-        {
-            
-        }
+            using PrintCodeDialog printCodeDialog = new PrintCodeDialog(!FastColoredTextBox.Selection.IsEmpty);
+            if (printCodeDialog.ShowDialog(ParentForm) == DialogResult.OK)
+            {
+                printCodeDialog.PrintDocument.DocumentName = "RedJ Code: " + (Path.GetFileName(FilePath) ?? "new file");
+                ExportToRTF export = new ExportToRTF()
+                {
+                    UseOriginalFont = true,
+                    IncludeLineNumbers = printCodeDialog.IncludeLineNumbers
+                };
+                bool selectionOnly = printCodeDialog.PrintDocument.PrinterSettings.PrintRange == System.Drawing.Printing.PrintRange.Selection;
+                string rtf = export.GetRtf(selectionOnly ? FastColoredTextBox.Selection : FastColoredTextBox.Range);
+                RichTextPrinter.PrintRTF(rtf, printCodeDialog.PrintDocument);
+            }
+        } // use this for printing
 
         public void ShowProperties()
         {
-            if (FilePath != null)
+            if (FilePath == null) return;
+
+            // ShellProperties.ShowPropertiesDialog(FilePath);
+
+            using PropertiesDialog propertiesDialog = new PropertiesDialog(FilePath, Encoding);
+            if (propertiesDialog.ShowDialog(ParentForm) == DialogResult.OK)
             {
-                ShellProperties.ShowPropertiesDialog(FilePath);
+                if (ParentForm.IsSafeToClose(this))
+                {
+                    bool changed = false;
+
+                    if (!Encoding.Equals(Encoding, propertiesDialog.FileEncoding))
+                    {
+                        Encoding = propertiesDialog.FileEncoding;
+                        changed = true;
+                    }
+
+                    if (!String.Equals(propertiesDialog.FilePath, propertiesDialog.NewFilePath))
+                    {
+                        File.Move(propertiesDialog.FilePath, propertiesDialog.NewFilePath);
+                        FilePath = propertiesDialog.NewFilePath;
+                        changed = true;
+                    }
+
+                    if (changed)
+                    { 
+                        Reload(); 
+                    }
+                }
+            }
+
+        }
+        
+        public void ChangeEncoding()
+        {
+            if (!(IsSaved || Save()))
+            {
+                return;
+            }
+            using EncodingSelectionDialog encodingSelectionDialog = new EncodingSelectionDialog(Encoding);
+            if (encodingSelectionDialog.ShowDialog(ParentForm) == DialogResult.OK)
+            {
+                Encoding = encodingSelectionDialog.Encoding;
+                Reload();
             }
         }
 
@@ -636,50 +934,55 @@ namespace RedJ_Code
         public void Undo()
         {
             FastColoredTextBox.Undo();
+            AddKeysToMacro(Keys.Control | Keys.Z);
         }
 
         public void Redo()
         {
             FastColoredTextBox.Redo();
+            AddKeysToMacro(Keys.Control | Keys.Y);
         }
 
         public void Cut()
         {
             FastColoredTextBox.Cut();
+            AddKeysToMacro(Keys.Control | Keys.X);
         }
 
         public void Copy()
         {
             FastColoredTextBox.Copy();
+            AddKeysToMacro(Keys.Control | Keys.C);
         }
 
         public void Paste()
         {
             FastColoredTextBox.Paste();
+            AddKeysToMacro(Keys.Control | Keys.V);
         }
 
         public void SelectAll()
         {
             FastColoredTextBox.SelectAll();
+            AddKeysToMacro(Keys.Control | Keys.A);
         }
 
         public void ShowFindDialog()
         {
             FastColoredTextBox.ShowFindDialog();
 
-            if (FastColoredTextBox.findForm != null)
+            if (FastColoredTextBox.FindDialogForm != null)
             {
-                FastColoredTextBox.findForm.MinimizeBox = false;
-                FastColoredTextBox.findForm.MaximizeBox = false;
-                FastColoredTextBox.findForm.TopMost = false;
-                FastColoredTextBox.findForm.Owner = FastColoredTextBox.ParentForm;
-                FastColoredTextBox.findForm.Text = "Find";
-                FastColoredTextBox.findForm.Controls["label1"].Text = "F&ind:";
-                FastColoredTextBox.findForm.Controls["cbMatchCase"].Text = "Match &Case";
-                FastColoredTextBox.findForm.Controls["cbWholeWord"].Text = "Match &Whole Word";
-                FastColoredTextBox.findForm.Controls["cbRegex"].Text = "Reg&Ex";
-                FastColoredTextBox.findForm.Controls["btFindNext"].Text = "&Find Next";
-                FastColoredTextBox.findForm.Controls["btClose"].Text = "Cancel";
+                FastColoredTextBox.FindDialogForm.Owner = FastColoredTextBox.ParentForm;
+                FastColoredTextBox.FindDialogForm.Text = "Find";
+                FastColoredTextBox.FindDialogForm.Controls["label1"].Text = "&Find:";
+                FastColoredTextBox.FindDialogForm.Controls["cbMatchCase"].Text = "Match &Case";
+                FastColoredTextBox.FindDialogForm.Controls["cbWholeWord"].Text = "Match &Whole Word";
+                FastColoredTextBox.FindDialogForm.Controls["cbRegex"].Text = "RegE&x";
+                FastColoredTextBox.FindDialogForm.Controls["btFindNext"].Text = "Find &Next";
+                FastColoredTextBox.FindDialogForm.Controls["btFindPrev"].Text = "Find &Prev";
+                FastColoredTextBox.FindDialogForm.Controls["btFindAll"].Text = "Find &All";
+                FastColoredTextBox.FindDialogForm.Controls["btClose"].Text = "Cancel";
             }
         }
 
@@ -687,22 +990,22 @@ namespace RedJ_Code
         {
             FastColoredTextBox.ShowReplaceDialog();
 
-            if (FastColoredTextBox.replaceForm != null)
+            if (FastColoredTextBox.ReplaceDialogForm != null)
             {
-                FastColoredTextBox.replaceForm.MinimizeBox = false;
-                FastColoredTextBox.replaceForm.MaximizeBox = false;
-                FastColoredTextBox.replaceForm.TopMost = false;
-                FastColoredTextBox.replaceForm.Owner = FastColoredTextBox.ParentForm;
-                FastColoredTextBox.replaceForm.Text = "Find and Replace";
-                FastColoredTextBox.replaceForm.Controls["label1"].Text = "F&ind:";
-                FastColoredTextBox.replaceForm.Controls["label2"].Text = "Re&place:";
-                FastColoredTextBox.replaceForm.Controls["cbMatchCase"].Text = "Match &Case";
-                FastColoredTextBox.replaceForm.Controls["cbWholeWord"].Text = "Match &Whole Word";
-                FastColoredTextBox.replaceForm.Controls["cbRegex"].Text = "Reg&Ex";
-                FastColoredTextBox.replaceForm.Controls["btFindNext"].Text = "&Find Next";
-                FastColoredTextBox.replaceForm.Controls["btReplace"].Text = "&Replace";
-                FastColoredTextBox.replaceForm.Controls["btReplaceAll"].Text = "Replace &All";
-                FastColoredTextBox.replaceForm.Controls["btClose"].Text = "Cancel";
+                FastColoredTextBox.ReplaceDialogForm.Owner = FastColoredTextBox.ParentForm;
+                FastColoredTextBox.ReplaceDialogForm.Text = "Find and Replace";
+                FastColoredTextBox.ReplaceDialogForm.Controls["label1"].Text = "&Find:";
+                FastColoredTextBox.ReplaceDialogForm.Controls["label2"].Text = "Re&place:";
+                FastColoredTextBox.ReplaceDialogForm.Controls["cbMatchCase"].Text = "Match &Case";
+                FastColoredTextBox.ReplaceDialogForm.Controls["cbWholeWord"].Text = "Match &Whole Word";
+                FastColoredTextBox.ReplaceDialogForm.Controls["cbRegex"].Text = "RegE&x";
+                FastColoredTextBox.ReplaceDialogForm.Controls["btFindNext"].Text = "Find &Next";
+                FastColoredTextBox.ReplaceDialogForm.Controls["btFindPrev"].Text = "Find &Prev";
+                FastColoredTextBox.ReplaceDialogForm.Controls["btFindAll"].Text = "Find &All";
+                FastColoredTextBox.ReplaceDialogForm.Controls["btReplace"].Text = "&Replace Next";
+                FastColoredTextBox.ReplaceDialogForm.Controls["btReplacePrev"].Text = "R&eplace Prev";
+                FastColoredTextBox.ReplaceDialogForm.Controls["btReplaceAll"].Text = "Replace A&ll";
+                FastColoredTextBox.ReplaceDialogForm.Controls["btClose"].Text = "Cancel";
             }
         }
 
@@ -724,6 +1027,7 @@ namespace RedJ_Code
         public void DoAutoIndent()
         {
             FastColoredTextBox.DoAutoIndent();
+            AddKeysToMacro(Keys.Control | Keys.I);
         }
 
         public void CommentSelected()
@@ -741,6 +1045,7 @@ namespace RedJ_Code
             {
                 FastColoredTextBox.InsertLinePrefix(FastColoredTextBox.CommentPrefix);
             }
+            AddKeysToMacro(Keys.Control | Keys.K);
         }
 
         public void RemoveCommentPrefix()
@@ -753,6 +1058,7 @@ namespace RedJ_Code
             {
                 FastColoredTextBox.RemoveLinePrefix(FastColoredTextBox.CommentPrefix);
             }
+            AddKeysToMacro(Keys.Control | Keys.Shift | Keys.K);
         }
 
         private void InsertAndSelectText(string text)
@@ -765,27 +1071,64 @@ namespace RedJ_Code
         public void MoveSelectedLinesUp()
         {
             FastColoredTextBox.MoveSelectedLinesUp();
+            AddKeysToMacro(Keys.Alt | Keys.Up);
         }
 
         public void MoveSelectedLinesDown()
         {
             FastColoredTextBox.MoveSelectedLinesDown();
+            AddKeysToMacro(Keys.Alt | Keys.Down);
         }
 
-        public void AutoFormatSelection()
+        public void AutoFormatSelection(Language lang)
         {
-            switch (FastColoredTextBox.Language)
+            if (FastColoredTextBox.SelectionLength < 0)
+            {
+                return;
+            }
+            switch (lang)
             {
                 case Language.JSON:
-                    if (FastColoredTextBox.SelectionLength > 0)
-                    {
-                        FastColoredTextBox.SelectedText = CodeFormatter.FormatJSON(FastColoredTextBox.SelectedText);
-                    }
+                    InsertAndSelectText(AdvancedStringManipulator.FormatJSON(FastColoredTextBox.SelectedText));
+                    break;
+                case Language.XML:
+                    InsertAndSelectText(AdvancedStringManipulator.FormatXML(FastColoredTextBox.SelectedText));
                     break;
                 default:
                     MessageBox.Show(ParentForm, StringTable.FailedToAutoFormatMessageBoxText);
-                    break;
+                    return;
             }
+            DoAutoIndent();
+        }
+
+        public void EncodeBase64()
+        {
+            InsertAndSelectText(AdvancedStringManipulator.EncodeBase64(FastColoredTextBox.SelectedText, Encoding));
+        }
+
+        public void DecodeBase64()
+        {
+            InsertAndSelectText(AdvancedStringManipulator.DecodeBase64(FastColoredTextBox.SelectedText, Encoding));
+        }
+
+        public void EncodeURL()
+        {
+            InsertAndSelectText(AdvancedStringManipulator.EncodeURL(FastColoredTextBox.SelectedText));
+        }
+
+        public void DecodeURL()
+        {
+            InsertAndSelectText(AdvancedStringManipulator.DecodeURL(FastColoredTextBox.SelectedText));
+        }
+
+        public void EncodeRegex()
+        {
+            InsertAndSelectText(AdvancedStringManipulator.EncodeRegex(FastColoredTextBox.SelectedText));
+        }
+
+        public void DecodeRegex()
+        {
+            InsertAndSelectText(AdvancedStringManipulator.DecodeRegex(FastColoredTextBox.SelectedText));
         }
 
         public void ShowAutocompleteMenu()
@@ -832,11 +1175,13 @@ namespace RedJ_Code
         public void UpperCase()
         {
             FastColoredTextBox.UpperCase();
+            AddKeysToMacro(Keys.Control | Keys.U);
         }
 
         public void LowerCase()
         {
             FastColoredTextBox.LowerCase();
+            AddKeysToMacro(Keys.Control | Keys.Shift | Keys.U);
         }
 
         public void TitleCase()
@@ -847,6 +1192,16 @@ namespace RedJ_Code
         public void SentenceCase()
         {
             FastColoredTextBox.SentenceCase();
+        }
+
+        public void InvertCase()
+        {
+            FastColoredTextBox.InvertCase();
+        }
+
+        public void RandomCase()
+        {
+            FastColoredTextBox.RandomCase();
         }
 
         public void BookmarkLine()
@@ -957,36 +1312,186 @@ namespace RedJ_Code
             FastColoredTextBox.Selection.Start = p1;
         }
 
-        public void StartRecoringMacro()
+        #region JSON Stuff
+
+        private void EnsureEmptyLine()
+        {
+            string currLine = FastColoredTextBox.Lines[FastColoredTextBox.Selection.FromLine];
+            if (!string.IsNullOrWhiteSpace(currLine))
+            {
+                InsertText("\n");
+            }
+        }
+
+        private bool NeedAppendComma()
+        {
+            //if (FastColoredTextBox.Selection.FromLine == FastColoredTextBox.LinesCount - 1) return false;
+            //string nextLine = FastColoredTextBox.Lines[FastColoredTextBox.Selection.FromLine + 1].TrimStart();
+            //return nextLine.StartsWith('{') || nextLine.StartsWith('[') || nextLine.StartsWith('"');
+
+            int line = FastColoredTextBox.Selection.FromLine;
+            if (line == FastColoredTextBox.LinesCount - 1) return false;
+            int maxSearch = Math.Min(line + 20, FastColoredTextBox.LinesCount - 1); // search for max this number of lines
+
+            do
+            {
+                line++;
+                var r = FastColoredTextBox.GetLine(line);
+                var t = r.Text.TrimStart();
+                if (t.StartsWith('"') || t.StartsWith('{') || t.StartsWith('{'))
+                    return true;
+            }
+            while (string.IsNullOrWhiteSpace(FastColoredTextBox.Lines[line]) && line < maxSearch);
+
+            return false;
+        }
+
+        private void EnsureComma()
+        {
+            int line = FastColoredTextBox.Selection.FromLine;
+            if (line == 0) return;
+
+            Place p;
+
+            do
+            {
+                line--;
+                var r = FastColoredTextBox.GetLine(line);
+                var t = r.Text.TrimEnd();
+                if (t.EndsWith(',') || t.EndsWith('{') || t.EndsWith('['))
+                    return;
+                else
+                    p = r.End;
+            }   
+            while (string.IsNullOrWhiteSpace(FastColoredTextBox.Lines[line]) && line > 0) ;
+
+            Place caret = FastColoredTextBox.Selection.Start;
+            FastColoredTextBox.Selection.Start = p;
+            FastColoredTextBox.InsertText(",");
+            FastColoredTextBox.Selection.Start = caret;
+        }
+
+        private void GoToSelectionEnd()
+        {
+            Place end = FastColoredTextBox.GetLine(FastColoredTextBox.Selection.ToLine).End;
+            FastColoredTextBox.SelectionLength = 0;
+            FastColoredTextBox.Selection.Start = end;
+        }
+
+        private int GetBracketType()
+        {
+            Place start = FastColoredTextBox.Selection.End;
+
+            var r1 = FastColoredTextBox.GetBracketsRange(start, '{', '}', false);
+            var r2 = FastColoredTextBox.GetBracketsRange(start, '[', ']', false);
+
+            if (r1 == null && r2 == null) return 0;
+            else if (r1 != null && r2 == null) return 1;
+            else if (r1 == null && r2 != null) return 2;
+            else return r1!.Start > r2!.Start ? 1 : 2;
+        }
+         
+        public void InsertNewJSONObject()
+        {
+            int bracketType = GetBracketType();
+
+            FastColoredTextBox.BeginAutoUndo();
+
+            GoToSelectionEnd();
+            EnsureEmptyLine();
+            EnsureComma();
+
+            string str = bracketType == 1 ? "\"\": {\n\n}" : "{\n\n}";
+            if (NeedAppendComma()) str += ",";
+
+            InsertAndSelectText(str);
+            FastColoredTextBox.DoAutoIndent();
+
+            FastColoredTextBox.EndAutoUndo();
+        }
+
+        public void InsertNewJSONArray()
+        {
+            int bracketType = GetBracketType();
+
+            if (bracketType == 0) return;
+
+            FastColoredTextBox.BeginAutoUndo();
+
+            GoToSelectionEnd();
+            EnsureEmptyLine();
+            EnsureComma();
+
+            string str = bracketType == 1 ? "\"\": [\n\n]" : "[\n\n]";
+            if (NeedAppendComma()) str += ",";
+
+            InsertAndSelectText(str);
+            FastColoredTextBox.DoAutoIndent();
+
+            FastColoredTextBox.EndAutoUndo();
+        }
+
+        public void InsertNewJSONKeyValuePair()
+        {
+            int bracketType = GetBracketType();
+
+            if (bracketType == 0) return;
+
+            FastColoredTextBox.BeginAutoUndo();
+
+            GoToSelectionEnd();
+            EnsureEmptyLine();
+            EnsureComma();
+
+            string str = bracketType == 1 ? "\"\": \"\"" : "\"\"";
+            if (NeedAppendComma()) str += ",";
+
+            InsertAndSelectText(str);
+            FastColoredTextBox.DoAutoIndent();
+
+            FastColoredTextBox.EndAutoUndo();
+        }
+
+        #endregion
+
+        public void InsertDateTime()
+        {
+            using InsertDateTimeDialog dlg = new();
+            if (dlg.ShowDialog(ParentForm) == DialogResult.OK)
+            {
+                InsertText(dlg.DateTimeString);
+            }
+        }
+
+        public bool IsRecordingMacro => FastColoredTextBox.MacrosManager.IsRecording;
+        public bool CanExecuteMacro => !FastColoredTextBox.MacrosManager.MacroIsEmpty;
+
+        public void StartRecordingMacro()
         {
             FastColoredTextBox.MacrosManager.IsRecording = true;
         }
 
-        public void StopRecoringMacro()
+        public void StopRecordingMacro()
         {
             FastColoredTextBox.MacrosManager.IsRecording = false;
         }
-    }
 
-    internal enum Snippet
-    {
-        CSharp_Main         =  0,
-        CSharp_ToString     =  1,
-        CSharp_Equals       =  2,
-        CSharp_GetHashCode  =  3,
+        public void ExecuteMacro()
+        {
+            FastColoredTextBox.MacrosManager.ExecuteMacros();
+        }
 
-        VB_Main             = 10,
-        VB_ToString         = 11,
-        VB_Equals           = 12,
-        VB_GetHashCode      = 13,
+        public void ClearMacro()
+        {
+            FastColoredTextBox.MacrosManager.ClearMacros();
+        }
 
-        HTML_Document       = 20,
-        HTML_Doctype        = 21,
-        HTML_Doctype401     = 22,
-        HTML_Doctype32      = 23,
-        HTML_Doctype2       = 24,
-        HTML_XUACompatible  = 25,
-
-        XML_Prolog          = 30,
+        public void AddKeysToMacro(Keys keys, bool ignoreRecording = false)
+        {
+            if (IsRecordingMacro || ignoreRecording)
+            {
+                FastColoredTextBox.MacrosManager.AddKeyToMacros(keys);
+            }
+        }
     }
 }

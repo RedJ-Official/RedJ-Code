@@ -2,12 +2,17 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
+	<AssemblyName>RedJCode</AssemblyName>
     <TargetFramework>net6.0-windows</TargetFramework>
     <RootNamespace>RedJ_Code</RootNamespace>
     <Nullable>enable</Nullable>
-    <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>disable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon>icon.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+    <ForceDesignerDpiUnaware>true</ForceDesignerDpiUnaware>
+	<EnableUnsafeUTF7Encoding>true</EnableUnsafeUTF7Encoding>
+	<StartupObject>RedJ_Code.Program</StartupObject>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,12 +20,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Reference Include="FastColoredTextBox">
-      <HintPath>..\..\FastColoredTextBox\Binary\FastColoredTextBox.dll</HintPath>
+      <HintPath>..\..\ImprovedFastColoredTextBox\Binary\FastColoredTextBox.dll</HintPath>
+      <Private>True</Private>
     </Reference>
   </ItemGroup>
 

@@ -15,46 +15,52 @@ namespace RedJ_Code
         private CodeTabPage CurrentTab => (CodeTabPage)tabControl.SelectedTab;
         private IEnumerable<CodeTabPage> AllTabs => tabControl.TabPages.Cast<CodeTabPage>();
 
-        private readonly Settings settings;
+        private readonly INI ini;
+        //private readonly Preferences preferences;
         private readonly RecentFilesList recentFiles;
 
-        private Dictionary<Snippet, string> snippets = new()
-        {
-            { Snippet.CSharp_Main               , "public static void Main(string[] args)\n{\n\n}"},
-            { Snippet.CSharp_ToString           , "public override string ToString()\n{\nreturn base.ToString();\n}" },
-            { Snippet.CSharp_Equals             , "public override bool Equals(object? obj)\n{\nreturn base.Equals(obj);\n}" },
-            { Snippet.CSharp_GetHashCode        , "public override int GetHashCode()\n{\nreturn base.GetHashCode();\n}" },
+        //private readonly PreferencesDialog preferencesDialog;
+        private readonly ColorPreferencesDialog colorPreferencesDialog;
 
-            { Snippet.VB_Main                   , "Sub Main(args As String())\n\nEnd Sub"},
-            { Snippet.VB_ToString               , "Public Overrides Function Equals(obj As Object) As Boolean\nReturn MyBase.Equals(obj)\nEnd Function" },
-            { Snippet.VB_Equals                 , "Public Overrides Function GetHashCode() As Integer\nReturn MyBase.GetHashCode()\nEnd Function" },
-            { Snippet.VB_GetHashCode            , "Public Overrides Function ToString() As String\nReturn MyBase.ToString()\nEnd Function" },
-
-            { Snippet.HTML_Document             , "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\">\n<title>YOUR WEBSITE TITLE</title>\n</head>\n<body>\nYOUR WEBSITE CONTENT\n</body>\n</html>" },
-            { Snippet.HTML_Doctype              , "<!DOCTYPE html>" },
-            { Snippet.HTML_Doctype401           , "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">" },
-            { Snippet.HTML_Doctype32            , "<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 3.2 Final//EN\">" },
-            { Snippet.HTML_Doctype2             , "<!DOCTYPE html PUBLIC \"-//IETF//DTD HTML 2.0//EN\">" },
-            { Snippet.HTML_XUACompatible        , "<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">" },
-
-            { Snippet.XML_Prolog                , "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" },
-        };
+        private int zoom = 100;
 
         private DiffMergeForm? DiffMerge;
         private HtmlDocEditForm? HtmlDocEdit;
+        private GuidMakeForm? GuidMakeForm;
+        private FileExplorerForm? FileExplorer;
+        private TerminalForm? Terminal;
 
-        //private Font textFont;
+        private Color LineNumberColor;
+        private Color BookmarkColor;
+        private Color FoldingIndicatorColor;
+        private Color CurrentLineColor;
+        private Color SelectionColor;
+        private Color DocumentMapColor;
+        private Color AutocompleteMenuColor;
+        private Color BackgroundColor;
+
+        /*
+         * Possible Fonts:
+         *  - Consolas
+         *  - Lucida Console
+         *  - Cascadia Code
+         */
+        private static readonly Font EditorFont = new Font("Consolas", 10, FontStyle.Regular, GraphicsUnit.Point);
 
         public MainForm(string[] args)
         {
             InitializeComponent();
-
             menuStrip.Renderer = new ImprovedToolStripSystemRenderer();
-            openFileDialog.Filter = StringTable.OpenFileDialogFilter;
-            settings = new Settings(Settings.GetSettingsFilePath(Application.ExecutablePath));
-            recentFiles = new RecentFilesList(9);
+            contextMenuStrip.Renderer = new ImprovedToolStripSystemRenderer();
+            tabContextMenuStrip.Renderer = new ImprovedToolStripSystemRenderer();
 
-            ReadSettings();
+            openFileDialog.Filter = StringTable.OpenFileDialogFilter;
+            ini = new INI(StaticINI.GetCurrentPathToINI());
+            recentFiles = new RecentFilesList(9);
+            //preferencesDialog = new PreferencesDialog();
+            colorPreferencesDialog = new ColorPreferencesDialog();
+
+            ReadPreferences();
             ReadRecentFiles();
 
             foreach (string arg in args)
@@ -66,70 +72,98 @@ namespace RedJ_Code
             {
                 NewTab();
             }
+
+
         }
 
         #region Settings
 
-        private void ReadSettings()
+        private void ReadPreferences()
         {
-            wordWrapToolStripMenuItem.Checked = settings.ReadBool("FastColoredTextBox", "WordWrap", false);
-            wordWrapAutoIndentToolStripMenuItem.Checked = settings.ReadBool("FastColoredTextBox", "WordWrapAutoIndent", false);
-            showLineNumbersToolStripMenuItem.Checked = settings.ReadBool("FastColoredTextBox", "ShowLineNumbers", true);
-            showFoldingLinesToolStripMenuItem.Checked = settings.ReadBool("FastColoredTextBox", "ShowFoldingLines", true);
-            showScrollBarsToolStripMenuItem.Checked = settings.ReadBool("FastColoredTextBox", "ShowScrollBars", true);
-            highlightCurrentLineToolStripMenuItem.Checked = settings.ReadBool("FastColoredTextBox", "CurrentLineColor", true);
-            highlightCurrentWordToolStripMenuItem.Checked = settings.ReadBool("FastColoredTextBox", "CurrentWordColor", true);
-            caretVisibleToolStripMenuItem.Checked = settings.ReadBool("FastColoredTextBox", "CaretVisible", true);
-            caretBlinkingToolStripMenuItem.Checked = settings.ReadBool("FastColoredTextBox", "CaretBlinking", true);
-            wideCaretToolStripMenuItem.Checked = settings.ReadBool("FastColoredTextBox", "WideCaret", false);
-            showCaretWhenIncativeToolStripMenuItem.Checked = settings.ReadBool("FastColoredTextBox", "ShowCaretWhenInactive", false);
-            autoIndentToolStripMenuItem.Checked = settings.ReadBool("FastColoredTextBox", "AutoIndent", true);
-            autoCompleteBracketsToolStripMenuItem.Checked = settings.ReadBool("FastColoredTextBox", "AutoCompleteBrackets", true);
-            virtualSpaceToolStripMenuItem.Checked = settings.ReadBool("FastColoredTextBox", "VirtualSpace", false);
-            documentMapVisibleToolStripMenuItem.Checked = settings.ReadBool("DocumentMap", "Visible", true);
-            rulerVisibleToolStripMenuItem.Checked = settings.ReadBool("Ruler", "Visible", true);
-            autocompleteMenuEnabledToolStripMenuItem.Checked = settings.ReadBool("AutocompleteMenu", "Enabled", true);
-            toolStripVisibleToolStripMenuItem.Checked = settings.ReadBool("ToolStrip", "Visible", true);
-            statusStripVisibleToolStripMenuItem.Checked = settings.ReadBool("StatusStrip", "Visible", true);
-            multilineTabsToolStripMenuItem.Checked = settings.ReadBool("TabControl", "Multiline", false);
-            autoSaveToolStripMenuItem.Checked = settings.ReadBool("Misc", "AutoSave", false);
+            wordWrapToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "WordWrap", false);
+            wordWrapAutoIndentToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "WordWrapAutoIndent", false);
+            showLineNumbersToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "ShowLineNumbers", true);
+            showFoldingLinesToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "ShowFoldingLines", true);
+            showScrollBarsToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "ShowScrollBars", true);
+            highlightFoldingIndicatorToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "HighlightFoldingIndicator", true);
+            highlightCurrentLineToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "HighlightCurrentLine", true);
+            highlightCurrentWordToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "HighlightCurrentWord", true);
+            caretVisibleToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "CaretVisible", true);
+            caretBlinkingToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "CaretBlinking", true);
+            wideCaretToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "WideCaret", false);
+            showCaretWhenIncativeToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "ShowCaretWhenInactive", false);
+            autoIndentToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "AutoIndent", true);
+            autoCompleteBracketsToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "AutoCompleteBrackets", true);
+            virtualSpaceToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "VirtualSpace", false);
+            allowDropToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "AllowDrop", true);
+            showInvisibleCharsToolStripMenuItem.Checked = ini.ReadBoolean("FastColoredTextBox", "ShowInvisibleChars", false);
+
+            documentMapVisibleToolStripMenuItem.Checked = ini.ReadBoolean("DocumentMap", "Visible", true);
+            rulerVisibleToolStripMenuItem.Checked = ini.ReadBoolean("Ruler", "Visible", true);
+            autocompleteMenuEnabledToolStripMenuItem.Checked = ini.ReadBoolean("AutocompleteMenu", "Enabled", true);
+            toolStripVisibleToolStripMenuItem.Checked = ini.ReadBoolean("ToolStrip", "Visible", true);
+            statusStripVisibleToolStripMenuItem.Checked = ini.ReadBoolean("StatusStrip", "Visible", true);
+            //tabControl.Appearance = (TabAppearance)settings.ReadInt32("TabControl", "Appearance", 0);
+            multilineTabsToolStripMenuItem.Checked = ini.ReadBoolean("TabControl", "Multiline", false);
+            //tabControl.SizeMode = (TabSizeMode)settings.ReadInt32("TabControl", "SizeMode", 0);
+            autoSaveToolStripMenuItem.Checked = ini.ReadBoolean("Misc", "AutoSave", false);
+
+            //Colors
+            LineNumberColor = Color.FromArgb(ini.ReadInt32("FastColoredTextBox", "LineNumberColor", ColorTable.LineNumberColor.ToArgb()));
+            BookmarkColor = Color.FromArgb(ini.ReadInt32("FastColoredTextBox", "BookmarkColor", ColorTable.BookmarkColor.ToArgb()));
+            FoldingIndicatorColor = Color.FromArgb(ini.ReadInt32("FastColoredTextBox", "FoldingIndicatorColor", ColorTable.FoldingIndicatorColor.ToArgb()));
+            CurrentLineColor = Color.FromArgb(ini.ReadInt32("FastColoredTextBox", "CurrentLineColor", ColorTable.CurrentLineColor.ToArgb()));
+            SelectionColor = Color.FromArgb(ini.ReadInt32("FastColoredTextBox", "SelectionColor", ColorTable.SelectionColor.ToArgb()));
+            DocumentMapColor = Color.FromArgb(ini.ReadInt32("DocumentMap", "ForeColor", ColorTable.DocumentMapForeColor.ToArgb()));
+            AutocompleteMenuColor = Color.FromArgb(ini.ReadInt32("AutocompleteMenu", "ForeColor", ColorTable.AutocompleteMenuColor.ToArgb()));
+            BackgroundColor = Color.FromArgb(ini.ReadInt32("FastColoredTextBox", "BackColor", ColorTable.BackgroundColor.ToArgb()));
+
             // Font
             //string fontFamilyName = settings.ReadString("Font", "FamilyName", null!);
             //int fontSize = settings.ReadInt("Font", "Size", -1);
-            //bool fontBold = settings.ReadBool("Font", "Bold", false);
-            //bool fontItalic = settings.ReadBool("Font", "Italic", false);
-            //bool fontUnderline = settings.ReadBool("Font", "Underline", false);
-            //bool fontStrikout = settings.ReadBool("Font", "Strikeout", false);
+            //bool fontBold = settings.ReadBoolean("Font", "Bold", false);
+            //bool fontItalic = settings.ReadBoolean("Font", "Italic", false);
+            //bool fontUnderline = settings.ReadBoolean("Font", "Underline", false);
+            //bool fontStrikout = settings.ReadBoolean("Font", "Strikeout", false);
             //if (fontFamilyName != null && fontSize != -1)
             //{
             //    textFont = Util.GenerateFont(fontFamilyName, fontSize, fontBold, fontItalic, fontUnderline, fontStrikout);
             //}
         }
 
-        private void WriteSettings()
+        private void WritePreferences()
         {
-            settings.WriteBool("FastColoredTextBox", "WordWrap", wordWrapToolStripMenuItem.Checked);
-            settings.WriteBool("FastColoredTextBox", "WordWrapAutoIndent", wordWrapAutoIndentToolStripMenuItem.Checked);
-            settings.WriteBool("FastColoredTextBox", "ShowLineNumbers", showLineNumbersToolStripMenuItem.Checked);
-            settings.WriteBool("FastColoredTextBox", "ShowFoldingLines", showFoldingLinesToolStripMenuItem.Checked);
-            settings.WriteBool("FastColoredTextBox", "ShowScrollBars", showScrollBarsToolStripMenuItem.Checked);
-            settings.WriteBool("FastColoredTextBox", "CurrentLineColor", highlightCurrentLineToolStripMenuItem.Checked);
-            settings.WriteBool("FastColoredTextBox", "CurrentWordColor", highlightCurrentWordToolStripMenuItem.Checked);
-            settings.WriteBool("FastColoredTextBox", "CaretVisible", caretVisibleToolStripMenuItem.Checked);
-            settings.WriteBool("FastColoredTextBox", "CaretBlinking", caretBlinkingToolStripMenuItem.Checked);
-            settings.WriteBool("FastColoredTextBox", "WideCaret", wideCaretToolStripMenuItem.Checked);
-            settings.WriteBool("FastColoredTextBox", "ShowCaretWhenInactive", showCaretWhenIncativeToolStripMenuItem.Checked);
-            settings.WriteBool("FastColoredTextBox", "AutoIndent", autoIndentToolStripMenuItem.Checked);
-            settings.WriteBool("FastColoredTextBox", "AutoCompleteBrackets", autoCompleteBracketsToolStripMenuItem.Checked);
-            settings.WriteBool("FastColoredTextBox", "VirtualSpace", virtualSpaceToolStripMenuItem.Checked);
-            settings.WriteBool("DocumentMap", "Visible", documentMapVisibleToolStripMenuItem.Checked);
-            settings.WriteBool("Ruler", "Visible", rulerVisibleToolStripMenuItem.Checked);
-            settings.WriteBool("AutocompleteMenu", "Enabled", autocompleteMenuEnabledToolStripMenuItem.Checked);
-            settings.WriteBool("ToolStrip", "Visible", toolStripVisibleToolStripMenuItem.Checked);
-            settings.WriteBool("StatusStrip", "Visible", statusStripVisibleToolStripMenuItem.Checked);
-            settings.WriteBool("TabControl", "Multiline", multilineTabsToolStripMenuItem.Checked);
+            ini.WriteBoolean("FastColoredTextBox", "WordWrap", wordWrapToolStripMenuItem.Checked);
+            ini.WriteBoolean("FastColoredTextBox", "WordWrapAutoIndent", wordWrapAutoIndentToolStripMenuItem.Checked);
+            ini.WriteBoolean("FastColoredTextBox", "ShowLineNumbers", showLineNumbersToolStripMenuItem.Checked);
+            ini.WriteBoolean("FastColoredTextBox", "ShowFoldingLines", showFoldingLinesToolStripMenuItem.Checked);
+            ini.WriteBoolean("FastColoredTextBox", "ShowScrollBars", showScrollBarsToolStripMenuItem.Checked);
+            ini.WriteBoolean("FastColoredTextBox", "ShowInvisibleChars", showInvisibleCharsToolStripMenuItem.Checked);
+            ini.WriteBoolean("FastColoredTextBox", "HighlightFoldingIndicator", highlightFoldingIndicatorToolStripMenuItem.Checked);
+            ini.WriteBoolean("FastColoredTextBox", "HighlightCurrentLine", highlightCurrentLineToolStripMenuItem.Checked);
+            ini.WriteBoolean("FastColoredTextBox", "HighlightCurrentWord", highlightCurrentWordToolStripMenuItem.Checked);
+            ini.WriteBoolean("FastColoredTextBox", "AutoIndent", autoIndentToolStripMenuItem.Checked);
+            ini.WriteBoolean("FastColoredTextBox", "AutoCompleteBrackets", autoCompleteBracketsToolStripMenuItem.Checked);
+            ini.WriteBoolean("FastColoredTextBox", "VirtualSpace", virtualSpaceToolStripMenuItem.Checked);
+            ini.WriteBoolean("FastColoredTextBox", "AllowDrop", allowDropToolStripMenuItem.Checked);
+            ini.WriteBoolean("DocumentMap", "Visible", documentMapVisibleToolStripMenuItem.Checked);
+            ini.WriteBoolean("Ruler", "Visible", rulerVisibleToolStripMenuItem.Checked);
+            ini.WriteBoolean("AutocompleteMenu", "Enabled", autocompleteMenuEnabledToolStripMenuItem.Checked);
+            ini.WriteBoolean("ToolStrip", "Visible", toolStripVisibleToolStripMenuItem.Checked);
+            ini.WriteBoolean("StatusStrip", "Visible", statusStripVisibleToolStripMenuItem.Checked);
+            ini.WriteBoolean("TabControl", "Multiline", multilineTabsToolStripMenuItem.Checked);
 
-            //settings.WriteBool("Misc", "AutoSave", autoSaveToolStripMenuItem.Checked);
+            //Colors
+            ini.WriteInt32("FastColoredTextBox", "LineNumberColor", LineNumberColor.ToArgb());
+            ini.WriteInt32("FastColoredTextBox", "BookmarkColor", BookmarkColor.ToArgb());
+            ini.WriteInt32("FastColoredTextBox", "FoldingIndicatorColor", FoldingIndicatorColor.ToArgb());
+            ini.WriteInt32("FastColoredTextBox", "CurrentLineColor", CurrentLineColor.ToArgb());
+            ini.WriteInt32("FastColoredTextBox", "SelectionColor", SelectionColor.ToArgb());
+            ini.WriteInt32("DocumentMap", "ForeColor", DocumentMapColor.ToArgb());
+            ini.WriteInt32("AutocompleteMenu", "ForeColor", AutocompleteMenuColor.ToArgb());
+            ini.WriteInt32("FastColoredTextBox", "BackColor", BackgroundColor.ToArgb());
+
+            //settings.WriteBoolean("Misc", "AutoSave", autoSaveToolStripMenuItem.Checked);
         }
 
         #endregion
@@ -142,6 +176,7 @@ namespace RedJ_Code
 
             reloadToolStripMenuItem.Enabled =
             propertiesToolStripMenuItem.Enabled =
+            changeEncodingToolStripMenuItem.Enabled =
             showInExplorerToolStripMenuItem.Enabled =
             copyFilePathToolStripMenuItem.Enabled =
                 CurrentTab.FilePath != null;
@@ -153,12 +188,14 @@ namespace RedJ_Code
 
             for (int i = 0; i < recentFiles.Files.Count; i++)
             {
-                ToolStripMenuItem item = new ToolStripMenuItem();
+                ToolStripMenuItem item = new()
+                {
+                    Text = $"&{i + 1} \"{recentFiles.Files[i]}\""
+                };
 
-                item.Text = $"&{i + 1} \"{recentFiles.Files[i]}\"";
                 item.Click += new EventHandler((sender, e) =>
                 {
-                    NewTab(item.Text[3..]);
+                    NewTab(item.Text[3..].Trim('"'));
                 });
 
                 recentToolStripMenuItem.DropDownItems.Add(item);
@@ -170,19 +207,19 @@ namespace RedJ_Code
 
         private void ReadRecentFiles()
         {
-            for (int i = 1; i <= recentFiles.MaxFiles; i++)
+            for (int i = recentFiles.MaxFiles; i > -1; --i)
             {
-                recentFiles.AddFile(settings.ReadString("Recent", i.ToString(), string.Empty));
+                recentFiles.AddFile(ini.ReadString("Recent", i.ToString(), string.Empty));
             }
         }
 
         private void WriteRecentFiles()
         {
-            settings.DeleteSection("Recent");
+            ini.DeleteSection("Recent");
 
             for (int i = 0; i < recentFiles.Files.Count; i++)
             {
-                settings.WriteString("Recent", (i + 1).ToString(), recentFiles.Files[i]);
+                ini.WriteString("Recent", i.ToString(), recentFiles.Files[i]);
             }
         }
 
@@ -200,51 +237,61 @@ namespace RedJ_Code
 
         #region Tabs
 
-        private void NewTab()
+        private void NewTab(string? filePath = null, bool readOnly = false)
         {
-            NewTab(null);
-        }
-
-        private void NewTab(string? filePath)
-        {
-            CodeTabPage tabPage = new CodeTabPage(filePath);
-            tabPage.WordWrap = wordWrapToolStripMenuItem.Checked;
-            tabPage.WordWrapAutoIndent = wordWrapAutoIndentToolStripMenuItem.Checked;
-            tabPage.ShowLineNumbers = showLineNumbersToolStripMenuItem.Checked;
-            tabPage.ShowFoldingLines = showFoldingLinesToolStripMenuItem.Checked;
-            tabPage.ShowScrollBars = showScrollBarsToolStripMenuItem.Checked;
-            tabPage.HighlightCurrentLine = highlightCurrentLineToolStripMenuItem.Checked;
-            tabPage.HighlightCurrentWord = highlightCurrentWordToolStripMenuItem.Checked;
-            tabPage.AutoIndent = autoIndentToolStripMenuItem.Checked;
-            tabPage.AutoCompleteBrackets = autoCompleteBracketsToolStripMenuItem.Checked;
-            tabPage.VirtualSpace = virtualSpaceToolStripMenuItem.Checked;
-            tabPage.CaretVisible = caretVisibleToolStripMenuItem.Checked;
-            tabPage.CaretBlinking = caretBlinkingToolStripMenuItem.Checked;
-            tabPage.ShowCaretWhenInactive = showCaretWhenIncativeToolStripMenuItem.Checked;
-            tabPage.WideCaret = wideCaretToolStripMenuItem.Checked;
-            tabPage.AutoSave = autoSaveToolStripMenuItem.Checked;
-            tabPage.DocumentMapVisible = documentMapVisibleToolStripMenuItem.Checked;
-            tabPage.RulerVisible = rulerVisibleToolStripMenuItem.Checked;
-            tabPage.AutocompleteMenuEnabled = autocompleteMenuEnabledToolStripMenuItem.Checked;
-            tabPage.TextFont = new Font("Consolas", 10, FontStyle.Regular, GraphicsUnit.Point);
-            tabPage.CodeChanged += new EventHandler(CodeChanged);
-            tabPage.SetContextMenu(contextMenuStrip);
-            if (tabPage.FilePath != null)
+            CodeTabPage newTab = new CodeTabPage(filePath, readOnly);
+            newTab.WordWrap = wordWrapToolStripMenuItem.Checked;
+            newTab.WordWrapAutoIndent = wordWrapAutoIndentToolStripMenuItem.Checked;
+            newTab.ShowLineNumbers = showLineNumbersToolStripMenuItem.Checked;
+            newTab.ShowFoldingLines = showFoldingLinesToolStripMenuItem.Checked;
+            newTab.ShowScrollBars = showScrollBarsToolStripMenuItem.Checked;
+            newTab.HighlightFoldingIndicator = highlightFoldingIndicatorToolStripMenuItem.Checked;
+            newTab.HighlightCurrentLine = highlightCurrentLineToolStripMenuItem.Checked;
+            newTab.HighlightCurrentWord = highlightCurrentWordToolStripMenuItem.Checked;
+            newTab.ShowInvisibleChars = showInvisibleCharsToolStripMenuItem.Checked;
+            newTab.AutoIndent = autoIndentToolStripMenuItem.Checked;
+            newTab.AutoCompleteBrackets = autoCompleteBracketsToolStripMenuItem.Checked;
+            newTab.VirtualSpace = virtualSpaceToolStripMenuItem.Checked;
+            newTab.AllowDragDrop = allowDropToolStripMenuItem.Checked;
+            newTab.CaretVisible = caretVisibleToolStripMenuItem.Checked;
+            newTab.CaretBlinking = caretBlinkingToolStripMenuItem.Checked;
+            newTab.ShowCaretWhenInactive = showCaretWhenIncativeToolStripMenuItem.Checked;
+            newTab.WideCaret = wideCaretToolStripMenuItem.Checked;
+            newTab.AutoSave = autoSaveToolStripMenuItem.Checked;
+            newTab.DocumentMapVisible = documentMapVisibleToolStripMenuItem.Checked;
+            newTab.RulerVisible = rulerVisibleToolStripMenuItem.Checked;
+            newTab.AutocompleteMenuEnabled = autocompleteMenuEnabledToolStripMenuItem.Checked;
+            newTab.LineNumberColor = LineNumberColor;
+            newTab.BookmarkColor = BookmarkColor;
+            newTab.FoldingIndicatorColor = FoldingIndicatorColor;
+            newTab.CurrentLineColor = CurrentLineColor;
+            newTab.DocumentMapColor = DocumentMapColor;
+            newTab.AutocompleteMenuColor = AutocompleteMenuColor;
+            newTab.BackgroundColor = BackgroundColor;
+            newTab.SelectionColor = SelectionColor;
+            newTab.TextFont = EditorFont; ;
+            newTab.Zoom = zoom;
+            newTab.CodeChanged += new EventHandler(CodeChanged);
+            newTab.ZoomChanged += new EventHandler(ZoomChanged);
+            newTab.SetContextMenu(contextMenuStrip);
+            newTab.SetAutocompleteMenuImageList(autocompleteImageList);
+            if (newTab.FilePath != null)
             {
-                AddRecentFile(tabPage.FilePath);
-                tabPage.Language = Util.GetLanguageFromFileExtension(Path.GetExtension(tabPage.FilePath));
+                AddRecentFile(newTab.FilePath);
+                Language lang = Util.GetLanguageFromFileExtension(Path.GetExtension(newTab.FilePath));
+                newTab.Language = lang == Language.Custom ? newTab.AutoDetectLanguage(false) : lang;
             }
-            tabControl.TabPages.Add(tabPage);
-            tabControl.SelectedTab = tabPage;
+            tabControl.TabPages.Add(newTab);
+            tabControl.SelectedTab = newTab;
             RefreshLanguage();
             CurrentTab.FocusOnTextBox();
         }
 
-        private bool IsSafeToClose(CodeTabPage tab)
+        internal bool IsSafeToClose(CodeTabPage tab)
         {
             if (!tab.IsSaved)
             {
-                tab.Select();
+                tabControl.SelectedTab = tab;
                 return MessageBox.Show(StringTable.CloseUnsavedFileMessageBoxText, tab.Text, MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question) switch
                 {
                     DialogResult.Yes => tab.Save(),
@@ -311,7 +358,7 @@ namespace RedJ_Code
 
         #region Language
 
-        private void RefreshLanguage()
+        internal void RefreshLanguage()
         {
             foreach (ToolStripItem item in languageToolStripMenuItem.DropDownItems)
             {
@@ -326,39 +373,23 @@ namespace RedJ_Code
                 return;
             }
 
-            switch (CurrentTab.Language)
+            (CurrentTab.Language switch
             {
-                case Language.PlainText:
-                    plainTextToolStripMenuItem.CheckState = CheckState.Indeterminate;
-                    break;
-                case Language.CSharp:
-                    csharpToolStripMenuItem.CheckState = CheckState.Indeterminate;
-                    break;
-                case Language.HTML:
-                    htmlToolStripMenuItem.CheckState = CheckState.Indeterminate;
-                    break;
-                case Language.JS:
-                    jsToolStripMenuItem.CheckState = CheckState.Indeterminate;
-                    break;
-                case Language.JSON:
-                    jsonToolStripMenuItem.CheckState = CheckState.Indeterminate;
-                    break;
-                case Language.Lua:
-                    luaToolStripMenuItem.CheckState = CheckState.Indeterminate;
-                    break;
-                case Language.PHP:
-                    phpToolStripMenuItem.CheckState = CheckState.Indeterminate;
-                    break;
-                case Language.SQL:
-                    sqlToolStripMenuItem.CheckState = CheckState.Indeterminate;
-                    break;
-                case Language.VB:
-                    vbToolStripMenuItem.CheckState = CheckState.Indeterminate;
-                    break;
-                case Language.XML:
-                    xmlToolStripMenuItem.CheckState = CheckState.Indeterminate;
-                    break;
-            }
+                Language.PlainText => plainTextToolStripMenuItem,
+                Language.CSharp => csharpToolStripMenuItem,
+                Language.HTML => htmlToolStripMenuItem,
+                Language.JS => jsToolStripMenuItem,
+                Language.JSON => jsonToolStripMenuItem,
+                Language.Lua => luaToolStripMenuItem,
+                Language.PHP => phpToolStripMenuItem,
+                Language.SQLServer => sqlToolStripMenuItem,
+                Language.VB => vbToolStripMenuItem,
+                Language.XML => xmlToolStripMenuItem,
+                Language.MySQL => mySqlToolStripMenuItem,
+                Language.Batch => batchToolStripMenuItem,
+                Language.Java => javaToolStripMenuItem,
+                Language.Python => pythonToolStripMenuItem
+            }).CheckState = CheckState.Indeterminate;
         }
 
         private void RefreshStatusStrip()
@@ -370,15 +401,50 @@ namespace RedJ_Code
             }
         }
 
+        private void RefreshMenuStrip()
+        {
+            undoToolStripMenuItem.Enabled =
+            redoToolStripMenuItem.Enabled =
+            cutToolStripMenuItem.Enabled =
+            pasteToolStripMenuItem.Enabled =
+            replaceToolStripMenuItem.Enabled =
+            linePrefixToolStripMenuItem.Enabled =
+            advancedToolStripMenuItem.Enabled =
+            caseToolStripMenuItem.Enabled =
+            macrosToolStripMenuItem.Enabled =
+            insertToolStripMenuItem.Enabled =
+            cutToolStripButton.Enabled =
+            pasteToolStripButton.Enabled =
+            !CurrentTab.ReadOnly;
+        }
+
+        private void SetZoomToAll()
+        {
+            foreach (CodeTabPage tab in AllTabs)
+            {
+                tab.Zoom = zoom;
+            }
+        }
+
         private void CodeChanged(object? sender, EventArgs e)
         {
             RefreshStatusStrip();
+        }
+
+        private void ZoomChanged(object? sender, EventArgs e)
+        {
+            if (sender is not null and CodeTabPage tab)
+            {
+                zoom = tab.Zoom;
+                SetZoomToAll();
+            }
         }
 
         private void tabControl_SelectedIndexChanged(object sender, EventArgs e)
         {
             RefreshStatusStrip();
             RefreshLanguage();
+            //RefreshMenuStrip();
         }
 
         #endregion
@@ -402,7 +468,14 @@ namespace RedJ_Code
             contextMenuToolStripSeparator1.Visible = (canUndo || canRedo) && (canCutCopy || canPaste);
             contextMenuToolStripSeparator2.Visible = (canCutCopy || canPaste || canUndo || canRedo) && canSelectAll;
 
-            e.Cancel = !(canUndo || canRedo || canCutCopy || canPaste || canSelectAll);
+            bool langIsJSON = CurrentTab.Language == Language.JSON;
+
+            newJsonObjectToolStripMenuItem.Visible = langIsJSON;
+            newJsonArrayToolStripMenuItem.Visible = langIsJSON;
+            newJsonKeyValuePairToolStripMenuItem.Visible = langIsJSON;
+            contextMenuToolStripSeparator3.Visible = langIsJSON && (canSelectAll || canCutCopy || canPaste || canUndo || canRedo);
+
+            e.Cancel = !(canUndo || canRedo || canCutCopy || canPaste || canSelectAll || langIsJSON);
         }
 
         #endregion
@@ -506,7 +579,7 @@ namespace RedJ_Code
             }
             if (closeOK)
             {
-                WriteSettings();
+                WritePreferences();
                 WriteRecentFiles();
             }
             e.Cancel = !closeOK;
@@ -530,7 +603,7 @@ namespace RedJ_Code
             {
                 foreach (string fileName in openFileDialog.FileNames)
                 {
-                    NewTab(fileName);
+                    NewTab(fileName, openFileDialog.ReadOnlyChecked);
                 }
                 WriteRecentFiles();
             }
@@ -585,19 +658,14 @@ namespace RedJ_Code
             CurrentTab.PrintRTF();
         }
 
-        private void printPreviewToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            CurrentTab.PrintPreview();
-        }
-
-        private void pageSetupToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            CurrentTab.PageSetupRTF();
-        }
-
         private void propertiesToolStripMenuItem_Click(object sender, EventArgs e)
         {
             CurrentTab.ShowProperties();
+        }
+
+        private void changeEncodingToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.ChangeEncoding();
         }
 
         private void showInExplorerToolStripMenuItem_Click(object sender, EventArgs e)
@@ -662,6 +730,22 @@ namespace RedJ_Code
         private void goToToolStripMenuItem_Click(object sender, EventArgs e)
         {
             CurrentTab.ShowGoToDialog();
+        }
+
+        private void linePrefixToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            using LinePrefixDialog dialog = new LinePrefixDialog();
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+                if (dialog.Remove)
+                    CurrentTab.RemoveLinePrefix(dialog.Prefix);
+                else
+                    CurrentTab.InsertLinePrefix(dialog.Prefix);
+        }
+
+        private void dateAndTimeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            //CurrentTab.InsertText(DateTime.Now.ToString());
+            CurrentTab.InsertDateTime();
         }
 
         private void increaseIndentToolStripMenuItem_Click(object sender, EventArgs e)
@@ -754,6 +838,16 @@ namespace RedJ_Code
             CurrentTab.SentenceCase();
         }
 
+        private void toInvertedCaseToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.InvertCase();
+        }
+
+        private void toRandomCaseToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.RandomCase();
+        }
+
         private void createXmlTagToolStripMenuItem_Click(object sender, EventArgs e)
         {
             CurrentTab.InsertXmlTag(false);
@@ -769,9 +863,44 @@ namespace RedJ_Code
             CurrentTab.ShowAutocompleteMenu();
         }
 
-        private void autoFormatSelectionToolStripMenuItem_Click(object sender, EventArgs e)
+        private void autoFormatJsonToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            CurrentTab.AutoFormatSelection();
+            CurrentTab.AutoFormatSelection(Language.JSON);
+        }
+
+        private void autoFormatXmlToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.AutoFormatSelection(Language.XML);
+        }
+
+        private void base64EncodeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.EncodeBase64();
+        }
+
+        private void base64DecodeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.DecodeBase64();
+        }
+
+        private void urlEncodeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.EncodeURL();
+        }
+
+        private void urlDecodeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.DecodeURL();
+        }
+
+        private void regexEncodeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.EncodeRegex();
+        }
+
+        private void regexDecodeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.DecodeRegex();
         }
 
         #endregion
@@ -817,79 +946,129 @@ namespace RedJ_Code
             //MessageBox.Show(SelectedTab.FastColoredTextBox.MacrosManager.Macros);
         }
 
+        private void macrosToolStripMenuItem_DropDownOpening(object sender, EventArgs e)
+        {
+            startRecordingToolStripMenuItem.Enabled = !CurrentTab.IsRecordingMacro;
+            stopRecordingToolStripMenuItem.Enabled = CurrentTab.IsRecordingMacro;
+            executeRecordedMacroToolStripMenuItem.Enabled = CurrentTab.CanExecuteMacro;
+            clearMacroToolStripMenuItem.Enabled = CurrentTab.CanExecuteMacro;
+        }
+
+        private void toggleMacroRecrodingToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (CurrentTab.IsRecordingMacro)
+                CurrentTab.StopRecordingMacro();
+            else
+                CurrentTab.StartRecordingMacro();
+        }
+
         private void startRecordingToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            CurrentTab.StartRecoringMacro();
+            CurrentTab.StartRecordingMacro();
         }
 
         private void stopRecordingToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            CurrentTab.StopRecoringMacro();
+            CurrentTab.StopRecordingMacro();
+        }
+
+        private void executeRecordedMacroToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.ExecuteMacro();
+        }
+
+        private void clearMacroToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.ClearMacro();
         }
 
         #endregion
 
-        #region View
+        #region Language
 
         private void plainTextToolStripMenuItem_Click(object sender, EventArgs e)
         {
             CurrentTab.Language = Language.PlainText;
-            RefreshLanguage();
         }
 
         private void csharpToolStripMenuItem_Click(object sender, EventArgs e)
         {
             CurrentTab.Language = Language.CSharp;
-            RefreshLanguage();
+        }
+
+        private void batchToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.Language = Language.Batch;
         }
 
         private void htmlToolStripMenuItem_Click(object sender, EventArgs e)
         {
             CurrentTab.Language = Language.HTML;
-            RefreshLanguage();
+        }
+
+        private void javaToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.Language = Language.Java;
         }
 
         private void jsToolStripMenuItem_Click(object sender, EventArgs e)
         {
             CurrentTab.Language = Language.JS;
-            RefreshLanguage();
         }
 
         private void jsonToolStripMenuItem_Click(object sender, EventArgs e)
         {
             CurrentTab.Language = Language.JSON;
-            RefreshLanguage();
         }
 
         private void luaToolStripMenuItem_Click(object sender, EventArgs e)
         {
             CurrentTab.Language = Language.Lua;
-            RefreshLanguage();
         }
 
         private void phpToolStripMenuItem_Click(object sender, EventArgs e)
         {
             CurrentTab.Language = Language.PHP;
-            RefreshLanguage();
+        }
+
+        private void pythonToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.Language = Language.Python;
         }
 
         private void sqlToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            CurrentTab.Language = Language.SQL;
-            RefreshLanguage();
+            CurrentTab.Language = Language.SQLServer;
+        }
+
+        private void mySqlLToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.Language = Language.MySQL;
         }
 
         private void vbToolStripMenuItem_Click(object sender, EventArgs e)
         {
             CurrentTab.Language = Language.VB;
-            RefreshLanguage();
         }
 
         private void xmlToolStripMenuItem_Click(object sender, EventArgs e)
         {
             CurrentTab.Language = Language.XML;
-            RefreshLanguage();
         }
+
+        private void refreshSyntaxHighlightingToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.RefreshSyntaxHighlighting();
+        }
+
+        private void autoDetectLanguageToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.Language = CurrentTab.AutoDetectLanguage(true);
+        }
+
+        #endregion
+
+        #region View
 
         private void wordWrapToolStripMenuItem_CheckedChanged(object sender, EventArgs e)
         {
@@ -928,6 +1107,22 @@ namespace RedJ_Code
             foreach (CodeTabPage tabPage in AllTabs)
             {
                 tabPage.ShowScrollBars = showScrollBarsToolStripMenuItem.Checked;
+            }
+        }
+
+        private void showInvisibleCharsToolStripMenuItem_CheckedChanged(object sender, EventArgs e)
+        {
+            foreach (CodeTabPage tabPage in AllTabs)
+            {
+                tabPage.ShowInvisibleChars = showInvisibleCharsToolStripMenuItem.Checked;
+            }
+        }
+
+        private void highlightFoldingIndicatorToolStripMenuItem_CheckedChanged(object sender, EventArgs e)
+        {
+            foreach (CodeTabPage tabPage in AllTabs)
+            {
+                tabPage.HighlightFoldingIndicator = highlightFoldingIndicatorToolStripMenuItem.Checked;
             }
         }
 
@@ -1016,6 +1211,14 @@ namespace RedJ_Code
             }
         }
 
+        private void allowDropToolStripMenuItem_CheckedChanged(object sender, EventArgs e)
+        {
+            foreach (CodeTabPage tabPage in AllTabs)
+            {
+                tabPage.AllowDragDrop = allowDropToolStripMenuItem.Checked;
+            }
+        }
+
         private void documentMapVisibleToolStripMenuItem_CheckedChanged(object sender, EventArgs e)
         {
             foreach (CodeTabPage tabPage in AllTabs)
@@ -1055,115 +1258,207 @@ namespace RedJ_Code
             tabControl.Multiline = multilineTabsToolStripMenuItem.Checked;
         }
 
-        private void refreshSyntaxHighlightingToolStripMenuItem_Click(object sender, EventArgs e)
+        private void fullscreenToolStripMenuItem_CheckedChanged(object sender, EventArgs e)
         {
-            CurrentTab.RefreshSyntaxHighlighting();
+            if (fullscreenToolStripMenuItem.Checked)
+            {
+                WindowState = FormWindowState.Normal;
+                FormBorderStyle = FormBorderStyle.None;
+                WindowState = FormWindowState.Maximized;
+            }
+            else
+            {
+                FormBorderStyle = FormBorderStyle.Sizable;
+                WindowState = FormWindowState.Maximized;
+            }
         }
 
-        private void autoDetectLanguageToolStripMenuItem_Click(object sender, EventArgs e)
+        private void preferencesToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            CurrentTab.AutoDetectLanguage();
+            //if (preferencesDialog.ShowDialog(this) == DialogResult.OK)
+            //{
+            //}
+        }
+
+        private void colorPreferencesToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            colorPreferencesDialog.LineNumberColor = LineNumberColor;
+            colorPreferencesDialog.BookmarkColor = BookmarkColor;
+            colorPreferencesDialog.FoldingIndicatorColor = FoldingIndicatorColor;
+            colorPreferencesDialog.CurrentLineColor = CurrentLineColor;
+            colorPreferencesDialog.SelectionColor = SelectionColor;
+            colorPreferencesDialog.DocumentMapColor = DocumentMapColor;
+            colorPreferencesDialog.AutocompleteMenuColor = AutocompleteMenuColor;
+            colorPreferencesDialog.BackgroundColor = BackgroundColor;
+
+            if (colorPreferencesDialog.ShowDialog(this) == DialogResult.OK)
+            {
+                LineNumberColor = colorPreferencesDialog.LineNumberColor;
+                BookmarkColor = colorPreferencesDialog.BookmarkColor;
+                FoldingIndicatorColor = colorPreferencesDialog.FoldingIndicatorColor;
+                CurrentLineColor = colorPreferencesDialog.CurrentLineColor;
+                SelectionColor = colorPreferencesDialog.SelectionColor;
+                DocumentMapColor = colorPreferencesDialog.DocumentMapColor;
+                AutocompleteMenuColor = colorPreferencesDialog.AutocompleteMenuColor;
+                BackgroundColor = colorPreferencesDialog.BackgroundColor;
+
+                foreach (CodeTabPage tab in AllTabs)
+                {
+                    tab.LineNumberColor = LineNumberColor;
+                    tab.BookmarkColor = BookmarkColor;
+                    tab.FoldingIndicatorColor = FoldingIndicatorColor;
+                    tab.CurrentLineColor = CurrentLineColor;
+                    tab.SelectionColor = SelectionColor;
+                    tab.DocumentMapColor = DocumentMapColor;
+                    tab.AutocompleteMenuColor = AutocompleteMenuColor;
+                    tab.BackgroundColor = BackgroundColor;
+                }
+            }
+        }
+
+        private void fontToolStripMenuItem1_DropDownOpening(object sender, EventArgs e)
+        {
+            //    fontToolStripMenuItem1.DropDownItems.Clear();
+            //    foreach (FontFamily fontFamily in FontFamily.Families)
+            //    {
+            //        if (fontFamily.)
+            //        {
+
+            //        }
+            //        ToolStripMenuItem item = new()
+            //        {
+            //            Text = fontFamily.Name,
+            //        };
+            //        item.Click += (sender, e) =>
+            //        {
+            //            CurrentTab.TextFont = new Font(((ToolStripMenuItem)sender).Text, CurrentTab.TextFont.Size);
+            //        };
+            //        fontToolStripMenuItem1.DropDownItems.Add(item);
+            //    }
         }
 
         #endregion
 
         #region Insert
 
+        #region C# Snippets
+
         private void csMainMethodToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            CurrentTab.InsertCodeSnippet(snippets[Snippet.CSharp_Main], Language.CSharp);
+            CurrentTab.InsertCodeSnippet(Snippets.CSharp_Main, Language.CSharp);
         }
 
         private void csToStringMethodToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            CurrentTab.InsertCodeSnippet(snippets[Snippet.CSharp_ToString], Language.CSharp);
+            CurrentTab.InsertCodeSnippet(Snippets.CSharp_ToString, Language.CSharp);
         }
 
         private void csEqualsMethodsToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            CurrentTab.InsertCodeSnippet(snippets[Snippet.CSharp_Equals], Language.CSharp); ;
+            CurrentTab.InsertCodeSnippet(Snippets.CSharp_Equals, Language.CSharp); ;
         }
 
-        private void getHashCodeToolStripMenuItem_Click(object sender, EventArgs e)
+        private void csGetHashCodeToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            CurrentTab.InsertCodeSnippet(snippets[Snippet.CSharp_GetHashCode], Language.CSharp);
+            CurrentTab.InsertCodeSnippet(Snippets.CSharp_GetHashCode, Language.CSharp);
         }
+
+        #endregion
+
+        #region Java Snippets
+
+        private void javaMainToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.InsertCodeSnippet(Snippets.Java_Main, Language.Java);
+        }
+
+        private void javaToStringToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.InsertCodeSnippet(Snippets.Java_ToString, Language.Java);
+        }
+
+        private void javaEqualsToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.InsertCodeSnippet(Snippets.Java_Equals, Language.Java);
+        }
+
+        private void javaHashCodeToolStripMenuItem1_Click(object sender, EventArgs e)
+        {
+            CurrentTab.InsertCodeSnippet(Snippets.Java_HashCode, Language.Java);
+        }
+
+        #endregion
+
+        #region VB Snippets
 
         private void vbMainToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            CurrentTab.InsertCodeSnippet(snippets[Snippet.VB_Main], Language.VB);
+            CurrentTab.InsertCodeSnippet(Snippets.VB_Main, Language.VB);
         }
 
         private void vbToStringToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            CurrentTab.InsertCodeSnippet(snippets[Snippet.VB_ToString], Language.VB);
+            CurrentTab.InsertCodeSnippet(Snippets.VB_ToString, Language.VB);
         }
 
         private void vbEqualsToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            CurrentTab.InsertCodeSnippet(snippets[Snippet.VB_Equals], Language.VB);
+            CurrentTab.InsertCodeSnippet(Snippets.VB_Equals, Language.VB);
         }
 
         private void vbGetHashCodeToolStripMenuItem1_Click(object sender, EventArgs e)
         {
-            CurrentTab.InsertCodeSnippet(snippets[Snippet.VB_GetHashCode], Language.VB);
+            CurrentTab.InsertCodeSnippet(Snippets.VB_GetHashCode, Language.VB);
         }
+
+        #endregion
+
+        #region HTML Snippets
 
         private void html5TemplateToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
-            CurrentTab.InsertCodeSnippet(snippets[Snippet.HTML_Document], Language.HTML);
+            CurrentTab.InsertCodeSnippet(Snippets.HTML_V5Document, Language.HTML);
         }
 
-        private void html5DoctypeToolStripMenuItem_Click(object sender, EventArgs e)
+        private void html401TemplateToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            CurrentTab.InsertCodeSnippet(snippets[Snippet.HTML_Doctype], Language.HTML);
-        }
-
-        private void html401DoctypeToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            CurrentTab.InsertCodeSnippet(snippets[Snippet.HTML_Doctype401], Language.HTML);
-        }
-
-        private void html32DoctypeToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            CurrentTab.InsertCodeSnippet(snippets[Snippet.HTML_Doctype32], Language.HTML);
-        }
-
-        private void html2DoctypeToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            CurrentTab.InsertCodeSnippet(snippets[Snippet.HTML_Doctype2], Language.HTML);
+            CurrentTab.InsertCodeSnippet(Snippets.HTML_V4Document, Language.HTML);
         }
 
         private void htmlXUACompatibleToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            CurrentTab.InsertCodeSnippet(snippets[Snippet.HTML_XUACompatible], Language.HTML);
+            CurrentTab.InsertCodeSnippet(Snippets.HTML_XUACompatible, Language.HTML);
         }
+
+        #endregion
+
+        #region XML Snippets
 
         private void xmlPrologToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            CurrentTab.InsertCodeSnippet(snippets[Snippet.XML_Prolog], Language.XML);
+            CurrentTab.InsertCodeSnippet(Snippets.XML_Prolog, Language.XML);
         }
 
-        private void linePrefixToolStripMenuItem_Click(object sender, EventArgs e)
+        #endregion
+
+        #region JSON Snippets
+
+        private void newJsonObjectToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            using LinePrefixDialog dialog = new LinePrefixDialog();
-            if (dialog.ShowDialog(this) == DialogResult.OK)
-            {
-                if (dialog.Remove)
-                {
-                    CurrentTab.RemoveLinePrefix(dialog.Prefix);
-                }
-                else
-                {
-                    CurrentTab.InsertLinePrefix(dialog.Prefix);
-                }
-            }
+            CurrentTab.InsertNewJSONObject();
         }
 
-        private void dateAndTimeToolStripMenuItem_Click(object sender, EventArgs e)
+        private void newJsonArrayToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            CurrentTab.InsertText(DateTime.Now.ToString());
+            CurrentTab.InsertNewJSONArray();
         }
+
+        private void newJsonKeyValuePairToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            CurrentTab.InsertNewJSONKeyValuePair();
+        }
+
+        #endregion
 
         #endregion
 
@@ -1177,40 +1472,78 @@ namespace RedJ_Code
             }
         }
 
+        private void terminalToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (IsNullOrDisposed(Terminal))
+            {
+                Terminal = new TerminalForm();
+            }
+
+            ShowForm(Terminal);
+        }
+
+        private void fileExplorerToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (IsNullOrDisposed(FileExplorer))
+            {
+                FileExplorer = new FileExplorerForm();
+            }
+
+            ShowForm(FileExplorer);
+
+            FileExplorer.AdjustLeft();
+        }
+
         private void diffMergeToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (ToolNeedsInstantiating(DiffMerge))
+            if (IsNullOrDisposed(DiffMerge))
             {
                 DiffMerge = new DiffMergeForm();
             }
 
-            ShowTool(DiffMerge);
+            ShowForm(DiffMerge);
         }
 
         private void htmlDocEditToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (ToolNeedsInstantiating(HtmlDocEdit))
+            if (IsNullOrDisposed(HtmlDocEdit))
             {
                 HtmlDocEdit = new HtmlDocEditForm();
             }
 
-            ShowTool(HtmlDocEdit);
+            ShowForm(HtmlDocEdit);
         }
 
-        private bool ToolNeedsInstantiating([NotNullWhen(false)] Form? tool)
+        private void guidMakeToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            return tool == null || tool.IsDisposed;
-        }
-
-        private void ShowTool(Form tool)
-        {
-            if (tool.Visible)
+            if (IsNullOrDisposed(GuidMakeForm))
             {
-                tool.MakeAppear();
+                GuidMakeForm = new GuidMakeForm();
+            }
+
+            ShowForm(GuidMakeForm);
+        }
+
+        private bool IsNullOrDisposed([NotNullWhen(false)] Form? form)
+        {
+            return form == null || form.IsDisposed;
+        }
+
+        private void ShowForm(Form form)
+        {
+            if (form.Visible)
+            {
+                if (form.WindowState == FormWindowState.Minimized)
+                {
+                    form.WindowState = FormWindowState.Normal;
+                }
+
+                form.BringToFront();
+                form.Activate();
             }
             else
             {
-                tool.Show(this);
+                form.Show(this);
             }
         }
 
@@ -1227,8 +1560,8 @@ namespace RedJ_Code
         {
             if (MessageBox.Show(StringTable.ResetSettingsMessageBoxText, "Reset Settings", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.OK)
             {
-                File.Delete(settings.FilePath);
-                ReadSettings();
+                File.Delete(ini.FilePath);
+                ReadPreferences();
                 ReadRecentFiles();
             }
         }
@@ -1240,5 +1573,9 @@ namespace RedJ_Code
         }
 
         #endregion
+
+        // Image //
+
+
     }
 }
